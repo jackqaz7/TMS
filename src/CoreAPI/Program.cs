@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using CoreAPI.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -7,6 +10,8 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+builder.Services.AddDbContext<AuthDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("Auth")));
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
