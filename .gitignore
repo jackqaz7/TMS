@@ -1,0 +1,36 @@
+# Build results
+bin/
+obj/
+
+# Visual Studio files
+.vs/
+*.user
+*.suo
+
+# Resharper / Rider
+*.DotSettings.user
+
+# Logs
+*.log
+
+# NuGet packages
+*.nupkg
+packages/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# OS-specific
+Thumbs.db
+.DS_Store
+
+# Test results
+TestResults/
+
+# Publish output
+publish/
+
+# Generated files
+*.generated.cs
