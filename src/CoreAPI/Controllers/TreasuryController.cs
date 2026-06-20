@@ -2,11 +2,13 @@
 using Microsoft.AspNetCore.Mvc;
 using CoreAPI.Models;
 using CoreAPI.Filters;
+using Microsoft.AspNetCore.Authorization;
 
 namespace CoreAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class TreasuryController : ControllerBase
     {
         [Route("Status")]
