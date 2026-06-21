@@ -1,6 +1,43 @@
-@CoreAPI_HostAddress = http://localhost:5001
+﻿@CoreAPI_HostAddress = https://localhost:7104
+@JwtToken = paste-token-here
 
-GET {{CoreAPI_HostAddress}}/weatherforecast/
+### Login and copy token into JwtToken above
+POST {{CoreAPI_HostAddress}}/api/users/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin"
+}
+
+### Treasury status
+GET {{CoreAPI_HostAddress}}/api/treasury/status
+Authorization: Bearer {{JwtToken}}
 Accept: application/json
 
-###
+### Capture a trade
+POST {{CoreAPI_HostAddress}}/api/treasury/trades
+Authorization: Bearer {{JwtToken}}
+Content-Type: application/json
+
+{
+  "tradeReference": "FX-USDINR-0001",
+  "counterparty": "Contoso Bank",
+  "instrument": "FX Spot",
+  "currency": "USD",
+  "side": "BUY",
+  "notional": 1000000,
+  "rate": 83.250000,
+  "tradeDate": "2026-06-21T00:00:00",
+  "settlementDate": "2026-06-23T00:00:00"
+}
+
+### List trades
+GET {{CoreAPI_HostAddress}}/api/treasury/trades
+Authorization: Bearer {{JwtToken}}
+Accept: application/json
+
+### Position summary
+GET {{CoreAPI_HostAddress}}/api/treasury/positions
+Authorization: Bearer {{JwtToken}}
+Accept: application/json

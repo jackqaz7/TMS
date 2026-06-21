@@ -3,54 +3,116 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:TMS_WPF_UI"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
+        Title="Treasury Management Dashboard"
+        Height="560"
+        Width="980"
+        MinHeight="520"
+        MinWidth="900"
+        Loaded="Window_Loaded">
 
-    <Grid>
-        <!-- Define two columns: left for menu, right for dashboard -->
+    <Grid Background="#F5F7FA">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="250"/>
-            <!-- Menu tree -->
+            <ColumnDefinition Width="220"/>
             <ColumnDefinition Width="*"/>
-            <!-- Dashboard -->
         </Grid.ColumnDefinitions>
 
-        <!-- Left Menu Tree -->
-        <TreeView Grid.Column="0" Margin="10,10,80,10">
-            <TreeViewItem Header="Treasury">
-                <TreeViewItem Header="Payments"/>
-                <TreeViewItem Header="Reports"/>
-            </TreeViewItem>
-            <TreeViewItem Header="Manufacturing">
-                <TreeViewItem Header="Orders"/>
-                <TreeViewItem Header="Inventory"/>
-            </TreeViewItem>
-            <TreeViewItem Header="Audit">
-                <TreeViewItem Header="Events"/>
-                <TreeViewItem Header="Logs"/>
-            </TreeViewItem>
-        </TreeView>
+        <Border Grid.Column="0" Background="#172033" Padding="16">
+            <DockPanel LastChildFill="True">
+                <TextBlock DockPanel.Dock="Top"
+                           Text="TMS"
+                           Foreground="White"
+                           FontSize="24"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,24"/>
 
-        <!-- Dashboard Area -->
-        <Grid Grid.Column="1" Margin="10">
+                <TreeView Background="Transparent"
+                          BorderThickness="0"
+                          Foreground="White">
+                    <TreeViewItem Header="Treasury" IsExpanded="True">
+                        <TreeViewItem Header="Positions" IsSelected="True"/>
+                        <TreeViewItem Header="Trades"/>
+                        <TreeViewItem Header="Payments"/>
+                    </TreeViewItem>
+                    <TreeViewItem Header="Manufacturing">
+                        <TreeViewItem Header="Orders"/>
+                        <TreeViewItem Header="Inventory"/>
+                    </TreeViewItem>
+                    <TreeViewItem Header="Audit">
+                        <TreeViewItem Header="Events"/>
+                        <TreeViewItem Header="Logs"/>
+                    </TreeViewItem>
+                </TreeView>
+            </DockPanel>
+        </Border>
+
+        <Grid Grid.Column="1" Margin="24">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="11*"/>
-                <RowDefinition Height="20*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Dashboard Header -->
-            <TextBlock Text="Dashboard" FontSize="24" FontWeight="Bold" Margin="-83,0,0,10"/>
+            <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,18">
+                <Button DockPanel.Dock="Right"
+                        x:Name="Logout"
+                        Content="Logout"
+                        Width="92"
+                        Height="32"
+                        Click="Logout_Click"/>
 
-            <!-- Dashboard Content -->
-            <StackPanel Grid.Row="1" Margin="-83,0,0,0" Grid.RowSpan="2">
-                <TextBlock Text="Welcome, Arjun!" FontSize="18" Margin="0,0,0,20"/>
-                <Button Content="View Reports" Width="150" Margin="0,0,0,10"/>
-                <Button Content="Manage Orders" Width="150" Margin="0,0,0,10"/>
-                <Button Content="Audit Logs" Width="150"/>
-            </StackPanel>
+                <StackPanel>
+                    <TextBlock Text="Treasury Positions"
+                               FontSize="26"
+                               FontWeight="SemiBold"
+                               Foreground="#172033"/>
+                    <TextBlock Text="Currency-level exposure calculated from captured trades"
+                               Foreground="#5D6678"
+                               Margin="0,4,0,0"/>
+                </StackPanel>
+            </DockPanel>
+
+            <DockPanel Grid.Row="1" Margin="0,0,0,12">
+                <Button DockPanel.Dock="Left"
+                        Content="Refresh"
+                        Width="96"
+                        Height="32"
+                        Command="{Binding RefreshPositionsCommand}"/>
+
+                <TextBlock Text="{Binding StatusMessage}"
+                           VerticalAlignment="Center"
+                           Foreground="#5D6678"
+                           Margin="12,0,0,0"/>
+            </DockPanel>
+
+            <DataGrid Grid.Row="2"
+                      ItemsSource="{Binding Positions}"
+                      AutoGenerateColumns="False"
+                      CanUserAddRows="False"
+                      CanUserDeleteRows="False"
+                      IsReadOnly="True"
+                      HeadersVisibility="Column"
+                      GridLinesVisibility="Horizontal"
+                      Background="White"
+                      BorderBrush="#D9DEE8"
+                      BorderThickness="1"
+                      RowHeight="34"
+                      AlternatingRowBackground="#F9FAFC">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Currency" Binding="{Binding Currency}" Width="110"/>
+                    <DataGridTextColumn Header="Buy Notional" Binding="{Binding BuyNotional, StringFormat=N2}" Width="150"/>
+                    <DataGridTextColumn Header="Sell Notional" Binding="{Binding SellNotional, StringFormat=N2}" Width="150"/>
+                    <DataGridTextColumn Header="Net Notional" Binding="{Binding NetNotional, StringFormat=N2}" Width="150"/>
+                    <DataGridTextColumn Header="Avg Rate" Binding="{Binding WeightedAverageRate, StringFormat=N6}" Width="130"/>
+                    <DataGridTextColumn Header="Trades" Binding="{Binding TradeCount}" Width="90"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Grid.Row="3"
+                       Text="Data path: SQL Server -> EF Core -> ASP.NET Core REST -> JWT-authenticated WPF client"
+                       Foreground="#7A8496"
+                       Margin="0,12,0,0"/>
         </Grid>
-        <Button x:Name="Logout" Content="Logout" HorizontalAlignment="Left" Margin="475,368,0,0" VerticalAlignment="Top" Grid.Column="1" Click="Logout_Click"/>
     </Grid>
 </Window>

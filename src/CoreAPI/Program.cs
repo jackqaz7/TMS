@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -14,6 +14,9 @@ builder.Services.AddOpenApi();
 
 builder.Services.AddDbContext<AuthDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("Auth")));
+
+builder.Services.AddDbContext<TmsDbContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("TMS")));
 
 builder.Services.AddAuthentication(options =>
 {
@@ -54,3 +57,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+
+

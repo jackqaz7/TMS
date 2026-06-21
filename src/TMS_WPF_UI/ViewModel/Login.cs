@@ -1,24 +1,21 @@
 ﻿using CoreAPI.Models;
 using System;
-using System.Windows;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Threading.Tasks;
+using System.Windows;
 using System.Windows.Input;
 using TMS_WPF_UI.Helpers;
-
 
 namespace TMS_WPF_UI.ViewModel
 {
     public class Login : INotifyPropertyChanged
     {
-        private string _username;
-        private string _password;
-        private string _Message;
+        private string _username = string.Empty;
+        private string _password = string.Empty;
+        private string _message = string.Empty;
 
         public string Username
         {
@@ -34,13 +31,13 @@ namespace TMS_WPF_UI.ViewModel
 
         public string Message
         {
-            get => _Message;
-            set { _Message = value; OnPropertyChanged(); }
+            get => _message;
+            set { _message = value; OnPropertyChanged(); }
         }
 
-        public event PropertyChangedEventHandler PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
-        private void OnPropertyChanged([CallerMemberName] string name = null)
+        private void OnPropertyChanged([CallerMemberName] string? name = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
@@ -62,14 +59,21 @@ namespace TMS_WPF_UI.ViewModel
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
-                Message = "Login successful!";
+
+                if (result == null || string.IsNullOrWhiteSpace(result.Token))
+                {
+                    Message = "Login succeeded, but the API did not return a token.";
+                    return;
+                }
+
+                // Store the token once after login. Other WPF screens use it as the Bearer
+                // token when calling protected API endpoints such as /api/treasury/positions.
                 SessionManager.JwtToken = result.Token;
+                Message = "Login successful!";
+
                 var home = new MainWindow();
                 home.Show();
-                Application.Current.Windows[0].Close(); // close Login window
-
-                //Properties.Settings.Default.JwtToken = result.Token;
-                //Properties.Settings.Default.Save();
+                Application.Current.Windows[0]?.Close();
             }
             else
             {
@@ -80,7 +84,7 @@ namespace TMS_WPF_UI.ViewModel
 
     public class LoginResponse
     {
-        public string Token { get; set; }
+        public string Token { get; set; } = string.Empty;
         public DateTime Expiration { get; set; }
     }
 }
