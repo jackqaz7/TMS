@@ -1,15 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
-using TMS_WPF_UI.ViewModel; 
 
 namespace TMS_WPF_UI
 {
@@ -21,15 +11,19 @@ namespace TMS_WPF_UI
         public Login()
         {
             InitializeComponent();
-            DataContext = new ViewModel.Login(); // attach ViewModel to XAML
+
+            // The view model owns login state and commands. The XAML text boxes bind to it.
+            DataContext = new ViewModel.Login();
         }
+
         private void PasswordBox_PasswordChanged(object sender, RoutedEventArgs e)
         {
             if (DataContext is ViewModel.Login vm)
             {
+                // PasswordBox.Password is not a normal bindable dependency property for
+                // security reasons, so this event manually copies it into the view model.
                 vm.Password = ((PasswordBox)sender).Password;
             }
         }
-
     }
 }

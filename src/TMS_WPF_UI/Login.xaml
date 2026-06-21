@@ -5,8 +5,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:TMS_WPF_UI"
         mc:Ignorable="d"
-        Title="Login" Height="450" Width="800">
-    <Grid Margin="20">
+        Title="Login" Height="450" Width="800" Background="#FAF9F6">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
+    <Grid Margin="20" Background="#FAF9F6">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -32,6 +35,15 @@
         <!-- Message -->
         <TextBlock Grid.Row="3" Foreground="Red" Margin="0,10,0,0"
                Text="{Binding Message}"/>
+        
+        <!-- Progress bar -->
+        <ProgressBar Grid.Row="2"
+             Margin="100,10,0,0"
+             Width="120"
+             Height="16"
+             IsIndeterminate="True"
+             Visibility="{Binding IsLoading, Converter={StaticResource BooleanToVisibilityConverter}}"/>
     </Grid>
 
 </Window>
+

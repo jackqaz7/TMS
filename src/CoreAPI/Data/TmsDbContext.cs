@@ -9,6 +9,8 @@ namespace CoreAPI.Data
         {
         }
 
+        // DbSet<Trade> is the EF Core representation of the Trades table.
+        // Add/Find/LINQ operations here are translated into SQL by EF Core.
         public DbSet<Trade> Trades { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -16,8 +18,13 @@ namespace CoreAPI.Data
             modelBuilder.Entity<Trade>(entity =>
             {
                 entity.HasKey(t => t.Id);
+
+                // TradeReference is unique because a real treasury trade should have one
+                // external/business identifier that prevents duplicate capture.
                 entity.HasIndex(t => t.TradeReference).IsUnique();
 
+                // Length and decimal precision are part of the database contract. Keeping
+                // them explicit avoids EF/Core SQL Server choosing broad defaults.
                 entity.Property(t => t.TradeReference).HasMaxLength(40);
                 entity.Property(t => t.Counterparty).HasMaxLength(120);
                 entity.Property(t => t.Instrument).HasMaxLength(40);

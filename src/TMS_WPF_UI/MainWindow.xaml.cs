@@ -17,21 +17,22 @@ namespace TMS_WPF_UI
 
             _dashboard = new Dashboard();
 
-            // DataContext is the object WPF binding expressions read from. In this screen,
-            // bindings such as {Binding Positions} and {Binding RefreshPositionsCommand}
-            // resolve against the Dashboard view model below.
+            // DataContext is the binding source for this window. XAML expressions such as
+            // {Binding Positions} and {Binding RefreshPositionsCommand} resolve here.
             DataContext = _dashboard;
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            // Loaded is a good moment for the first API call because the visual tree exists,
-            // so bound controls can immediately render the returned collection/status text.
+            // Window_Loaded is an event handler, so async void is acceptable here. For normal
+            // methods prefer async Task, as used by Dashboard.LoadPositionsAsync.
             await _dashboard.LoadPositionsAsync();
         }
 
         private void Logout_Click(object sender, RoutedEventArgs e)
         {
+            // Clearing the token removes the client-side login session. The next protected
+            // API call will fail unless the user logs in again and receives a new JWT.
             SessionManager.JwtToken = null;
             var loginWindow = new Login();
             loginWindow.Show();

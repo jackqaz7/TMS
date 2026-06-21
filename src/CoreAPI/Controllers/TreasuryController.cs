@@ -24,8 +24,6 @@ namespace CoreAPI.Controllers
         [MethodFilter("GET")]
         public IActionResult GetStatus()
         {
-            // OK is helper method from ControllerBase class.
-            // new {} is an anonymous object to return service status.
             return Ok(new { Service = "Treasury", Status = "Running", Timestamp = DateTime.UtcNow });
         }
 
@@ -33,12 +31,16 @@ namespace CoreAPI.Controllers
         [MethodFilter("POST")]
         public IActionResult ProcessTrade([FromBody] TransactionDto transaction)
         {
+            // Kept as a simple starter endpoint from the first API slice. New trade capture
+            // logic lives in POST /api/treasury/trades below.
             return Ok(new { service = "Treasury", transaction.Id });
         }
 
         [HttpPost("trades")]
         public async Task<ActionResult<TradeResponse>> CreateTrade([FromBody] CreateTradeRequest request)
         {
+            // API request DTOs are mapped into database entities instead of saving the
+            // request object directly. This keeps external contracts separate from storage.
             var trade = new Trade
             {
                 TradeReference = request.TradeReference.Trim(),
@@ -53,15 +55,21 @@ namespace CoreAPI.Controllers
                 CreatedUtc = DateTime.UtcNow
             };
 
+            // Add marks the entity as new in EF Core's change tracker. SaveChangesAsync
+            // translates that pending change into an INSERT statement.
             _tmsDbContext.Trades.Add(trade);
             await _tmsDbContext.SaveChangesAsync();
 
+            // 201 Created is useful for REST clients because it returns the created object
+            // and points to the endpoint that can retrieve it later.
             return CreatedAtAction(nameof(GetTrade), new { id = trade.Id }, ToResponse(trade));
         }
 
         [HttpGet("trades")]
         public async Task<ActionResult<IEnumerable<TradeResponse>>> GetTrades()
         {
+            // This LINQ query is not executed until ToListAsync. EF Core converts the sort
+            // and projection into SQL where possible.
             var trades = await _tmsDbContext.Trades
                 .OrderByDescending(t => t.TradeDate)
                 .ThenByDescending(t => t.Id)
@@ -74,6 +82,8 @@ namespace CoreAPI.Controllers
         [HttpGet("trades/{id:int}")]
         public async Task<ActionResult<TradeResponse>> GetTrade(int id)
         {
+            // FindAsync searches by primary key. EF Core can return a tracked entity from
+            // memory first, or query the database if it is not already loaded.
             var trade = await _tmsDbContext.Trades.FindAsync(id);
 
             if (trade == null)
@@ -87,6 +97,8 @@ namespace CoreAPI.Controllers
         [HttpGet("positions")]
         public async Task<ActionResult<IEnumerable<PositionSummaryDto>>> GetPositions()
         {
+            // Position is a read model: it is calculated from trades, not stored directly.
+            // GroupBy lets SQL Server aggregate by currency before results return to .NET.
             var positions = await _tmsDbContext.Trades
                 .GroupBy(t => t.Currency)
                 .Select(group => new PositionSummaryDto
@@ -108,6 +120,8 @@ namespace CoreAPI.Controllers
 
         private static TradeResponse ToResponse(Trade trade)
         {
+            // Response DTOs give the API freedom to shape output without exposing every
+            // database field or EF tracking detail to clients.
             return new TradeResponse
             {
                 Id = trade.Id,

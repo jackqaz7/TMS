@@ -17,8 +17,8 @@ namespace TMS_WPF_UI.ViewModel
         private string _statusMessage = "Positions not loaded yet.";
         private bool _isLoading;
 
-        // ObservableCollection notifies WPF when rows are added/removed, so the DataGrid
-        // can update without manually reassigning ItemsSource after every API call.
+        // ObservableCollection notifies WPF when rows are added/removed. That is why the
+        // DataGrid refreshes after we clear and repopulate this collection from the API.
         public ObservableCollection<PositionSummary> Positions { get; } = new();
 
         public string StatusMessage
@@ -33,10 +33,13 @@ namespace TMS_WPF_UI.ViewModel
             set { _isLoading = value; OnPropertyChanged(); }
         }
 
+        // ICommand lets XAML buttons call view-model logic without putting business/API
+        // code in the code-behind file.
         public ICommand RefreshPositionsCommand { get; }
 
         public Dashboard()
         {
+            // The second lambda disables the Refresh command while a load is already running.
             RefreshPositionsCommand = new RelayCommand(async _ => await LoadPositionsAsync(), _ => !IsLoading);
         }
 
@@ -55,11 +58,13 @@ namespace TMS_WPF_UI.ViewModel
             {
                 using var client = new HttpClient { BaseAddress = new Uri(TreasuryApiBaseAddress) };
 
-                // The API protects /api/treasury/* with [Authorize]. Adding the JWT as a
-                // Bearer token is the client-side half of that security handshake.
+                // The API protects /api/treasury/* with [Authorize]. This header sends the
+                // JWT received during login so the API can authenticate this WPF request.
                 client.DefaultRequestHeaders.Authorization =
                     new AuthenticationHeaderValue("Bearer", SessionManager.JwtToken);
 
+                // GetFromJsonAsync performs the HTTP GET and deserializes JSON into our
+                // PositionSummary DTO. await keeps the WPF UI thread responsive.
                 var positions = await client.GetFromJsonAsync<PositionSummary[]>("treasury/positions")
                     ?? Array.Empty<PositionSummary>();
 
@@ -92,10 +97,13 @@ namespace TMS_WPF_UI.ViewModel
 
         private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
         {
+            // PropertyChanged tells WPF to re-read a bound property, such as StatusMessage.
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
     }
 
+    // This class mirrors the JSON returned by GET /api/treasury/positions.
+    // Property names match the API response so System.Text.Json can bind automatically.
     public class PositionSummary
     {
         public string Currency { get; set; } = string.Empty;

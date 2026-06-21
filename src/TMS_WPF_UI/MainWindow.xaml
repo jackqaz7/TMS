@@ -17,7 +17,7 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0" Background="#172033" Padding="16">
+        <Border Grid.Column="0" Background="#FFB3E5FC" Padding="16">
             <DockPanel LastChildFill="True">
                 <TextBlock DockPanel.Dock="Top"
                            Text="TMS"

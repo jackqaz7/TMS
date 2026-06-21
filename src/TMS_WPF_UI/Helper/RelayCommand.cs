@@ -16,18 +16,22 @@ namespace TMS_WPF_UI.Helpers
 
         public bool CanExecute(object? parameter)
         {
-            // WPF calls CanExecute before enabling a bound button/menu item. The optional
-            // predicate lets each view model decide whether a command is currently allowed.
+            // WPF asks this before enabling command-bound controls. Example: the dashboard
+            // disables Refresh while IsLoading is true.
             return _canExecute == null || _canExecute(parameter);
         }
 
         public void Execute(object? parameter)
         {
+            // Execute runs the action supplied by the view model, such as LoginAsync or
+            // LoadPositionsAsync wrapped in a lambda.
             _execute(parameter);
         }
 
         public event EventHandler? CanExecuteChanged
         {
+            // CommandManager.RequerySuggested lets WPF re-check CanExecute during common UI
+            // events, keeping button enabled/disabled state in sync with view-model state.
             add { CommandManager.RequerySuggested += value; }
             remove { CommandManager.RequerySuggested -= value; }
         }

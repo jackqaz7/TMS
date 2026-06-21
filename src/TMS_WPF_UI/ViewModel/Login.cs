@@ -42,49 +42,68 @@ namespace TMS_WPF_UI.ViewModel
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
+        private bool _isLoading;
+
+        public bool IsLoading
+        {
+            get => _isLoading;
+            set { _isLoading = value; OnPropertyChanged(); }
+        }
+
         public ICommand LoginCommand { get; }
 
         public Login()
         {
+            // RelayCommand bridges the Login button in XAML to this async LoginAsync method.
             LoginCommand = new RelayCommand(async _ => await LoginAsync());
         }
 
         private async Task LoginAsync()
         {
-            using var client = new HttpClient { BaseAddress = new Uri("https://localhost:7104/api/") };
-            var loginDto = new LoginDto { Username = Username, Password = Password };
-
-            var response = await client.PostAsJsonAsync("users/login", loginDto);
-
-            if (response.IsSuccessStatusCode)
+            IsLoading = true;
+            try
             {
-                var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+                using var client = new HttpClient { BaseAddress = new Uri("https://localhost:7104/api/") };
+                var loginDto = new LoginDto { Username = Username, Password = Password };
 
-                if (result == null || string.IsNullOrWhiteSpace(result.Token))
+                // PostAsJsonAsync serializes LoginDto to JSON and sends it to UsersController.Login.
+                // await prevents the WPF UI from freezing while the API and SQL Server respond.
+                var response = await client.PostAsJsonAsync("users/login", loginDto);
+
+                if (response.IsSuccessStatusCode)
                 {
-                    Message = "Login succeeded, but the API did not return a token.";
-                    return;
+                    var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+
+                    if (result == null || string.IsNullOrWhiteSpace(result.Token))
+                    {
+                        Message = "Login succeeded, but the API did not return a token.";
+                        return;
+                    }
+
+                    // Store the token once after login. Other WPF screens use it as the Bearer
+                    // token when calling protected API endpoints such as /api/treasury/positions.
+                    SessionManager.JwtToken = result.Token;
+                    Message = "Login successful!";
+
+                    var home = new MainWindow();
+                    home.Show();
+                    Application.Current.Windows[0]?.Close();
                 }
-
-                // Store the token once after login. Other WPF screens use it as the Bearer
-                // token when calling protected API endpoints such as /api/treasury/positions.
-                SessionManager.JwtToken = result.Token;
-                Message = "Login successful!";
-
-                var home = new MainWindow();
-                home.Show();
-                Application.Current.Windows[0]?.Close();
+                else
+                {
+                    Message = "Invalid username or password.";
+                }
             }
-            else
+            finally
             {
-                Message = "Invalid username or password.";
+                IsLoading = false;
             }
         }
-    }
 
-    public class LoginResponse
-    {
-        public string Token { get; set; } = string.Empty;
-        public DateTime Expiration { get; set; }
+        public class LoginResponse
+        {
+            public string Token { get; set; } = string.Empty;
+            public DateTime Expiration { get; set; }
+        }
     }
 }
