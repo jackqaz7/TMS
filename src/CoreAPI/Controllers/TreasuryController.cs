@@ -1,5 +1,7 @@
-﻿using System;
+using System;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json;
 using CoreAPI.Data;
 using CoreAPI.Filters;
 using CoreAPI.Models;
@@ -7,7 +9,6 @@ using CoreAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.IdentityModel.Tokens.Jwt;
 
 namespace CoreAPI.Controllers
 {
@@ -18,13 +19,16 @@ namespace CoreAPI.Controllers
     {
         private readonly TmsDbContext _tmsDbContext;
         private readonly ITradeValidationService _tradeValidationService;
+        private readonly IAuditClient _auditClient;
 
         public TreasuryController(
             TmsDbContext tmsDbContext,
-            ITradeValidationService tradeValidationService)
+            ITradeValidationService tradeValidationService,
+            IAuditClient auditClient)
         {
             _tmsDbContext = tmsDbContext;
             _tradeValidationService = tradeValidationService;
+            _auditClient = auditClient;
         }
 
         [Route("Status")]
@@ -40,7 +44,6 @@ namespace CoreAPI.Controllers
         {
             return Ok(new { service = "Treasury", transaction.Id });
         }
-
 
         [HttpGet("fx-rates/latest")]
         public async Task<ActionResult<FxRateResponse>> GetLatestFxRate(
@@ -108,13 +111,35 @@ namespace CoreAPI.Controllers
                 IsCrossRate = true
             });
         }
+
         [HttpPost("trades")]
         public async Task<ActionResult<TradeResponse>> CreateTrade([FromBody] CreateTradeRequest request)
         {
+            // CreatedBy is taken from the authenticated JWT so the client cannot fake audit data.
+            var createdBy = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                ?? User.Identity?.Name
+                ?? "system";
+
             var validationErrors = _tradeValidationService.ValidateCreateTrade(request);
 
             if (validationErrors.Count > 0)
             {
+                await _auditClient.RecordAsync(new AuditEventRequest
+                {
+                    EventType = "ApiValidationFailed",
+                    EntityType = "Trade",
+                    ActionBy = createdBy,
+                    Summary = "Create trade request failed API validation.",
+                    PayloadJson = JsonSerializer.Serialize(new
+                    {
+                        request.TradeReference,
+                        request.TradeType,
+                        request.Currency1,
+                        request.Currency2,
+                        Errors = validationErrors
+                    })
+                });
+
                 return BadRequest(new
                 {
                     Message = "Trade validation failed.",
@@ -122,10 +147,23 @@ namespace CoreAPI.Controllers
                 });
             }
 
-            // CreatedBy is taken from the authenticated JWT so the client cannot fake audit data.
-            var createdBy = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
-                ?? User.Identity?.Name
-                ?? "system";
+            await _auditClient.RecordAsync(new AuditEventRequest
+            {
+                EventType = "TradeValidated",
+                EntityType = "Trade",
+                EntityId = request.TradeReference.Trim(),
+                ActionBy = createdBy,
+                Summary = $"Trade {request.TradeReference.Trim()} passed API validation.",
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    request.TradeReference,
+                    request.TradeType,
+                    request.Currency1,
+                    request.Currency2,
+                    request.Amount1,
+                    request.Amount2
+                })
+            });
 
             var trade = new Trade
             {
@@ -159,6 +197,8 @@ namespace CoreAPI.Controllers
 
             _tmsDbContext.Trades.Add(trade);
             await _tmsDbContext.SaveChangesAsync();
+
+            await RecordTradeCreatedAuditEvents(trade);
 
             return CreatedAtAction(nameof(GetTrade), new { id = trade.Id }, ToResponse(trade));
         }
@@ -210,7 +250,6 @@ namespace CoreAPI.Controllers
             return Ok(positions);
         }
 
-
         private async Task<FxRate?> FindLatestStoredFxRate(string fromCurrency, string toCurrency)
         {
             // AsNoTracking is used because FX lookup is read-only. EF Core can skip
@@ -245,6 +284,71 @@ namespace CoreAPI.Controllers
         {
             return currency.Length == 3 && currency.All(char.IsLetter);
         }
+
+        private async Task RecordTradeCreatedAuditEvents(Trade trade)
+        {
+            var tradePayload = JsonSerializer.Serialize(new
+            {
+                trade.Id,
+                trade.TradeReference,
+                trade.TradeType,
+                trade.Currency1,
+                trade.Amount1,
+                trade.Currency2,
+                trade.Amount2,
+                trade.FxRateUsed,
+                trade.RateDate,
+                trade.Side,
+                trade.TradeDate,
+                trade.SettlementDate
+            });
+
+            await _auditClient.RecordAsync(new AuditEventRequest
+            {
+                EventType = "TradeCreated",
+                EntityType = "Trade",
+                EntityId = trade.Id.ToString(),
+                ActionBy = trade.CreatedBy,
+                Summary = $"Trade {trade.TradeReference} was created for {trade.Currency1}/{trade.Currency2}.",
+                PayloadJson = tradePayload
+            });
+
+            await _auditClient.RecordAsync(new AuditEventRequest
+            {
+                EventType = "FxRateUsedForTradeCalculation",
+                EntityType = "Trade",
+                EntityId = trade.Id.ToString(),
+                ActionBy = trade.CreatedBy,
+                Summary = $"FX rate {trade.FxRateUsed} was used for trade {trade.TradeReference}.",
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    trade.Id,
+                    trade.TradeReference,
+                    FromCurrency = trade.Currency1,
+                    ToCurrency = trade.Currency2,
+                    trade.FxRateUsed,
+                    trade.RateDate
+                })
+            });
+
+            await _auditClient.RecordAsync(new AuditEventRequest
+            {
+                EventType = "PositionRecalculated",
+                EntityType = "Position",
+                EntityId = trade.Currency1,
+                ActionBy = trade.CreatedBy,
+                Summary = $"Position for {trade.Currency1} was impacted by trade {trade.TradeReference}.",
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    trade.Id,
+                    trade.TradeReference,
+                    Currency = trade.Currency1,
+                    trade.Side,
+                    trade.Amount1
+                })
+            });
+        }
+
         private static TradeResponse ToResponse(Trade trade)
         {
             return new TradeResponse
@@ -282,7 +386,3 @@ namespace CoreAPI.Controllers
         }
     }
 }
-
-
-
-

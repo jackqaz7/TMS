@@ -3,5 +3,6 @@
     <File Path=".gitignore" />
   </Folder>
   <Project Path="src/CoreAPI/CoreAPI.csproj" Id="ffd61b4b-cf4f-49b4-bcc4-a102e9df10f5" />
+  <Project Path="src/AuditService/AuditService.csproj" Id="0fbdd4d2-5a6a-4f4f-9a4d-4b9d9f9aa001" />
   <Project Path="src/TMS_WPF_UI/TMS_WPF_UI.csproj" Id="171dab9e-013d-4569-b4e2-79c60d19fb22" />
 </Solution>

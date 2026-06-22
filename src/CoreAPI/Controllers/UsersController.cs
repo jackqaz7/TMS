@@ -1,11 +1,13 @@
-﻿using CoreAPI.Data;
+using CoreAPI.Data;
 using CoreAPI.Models;
+using CoreAPI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 
 namespace CoreAPI.Controllers
 {
@@ -15,15 +17,20 @@ namespace CoreAPI.Controllers
     {
         private readonly AuthDbContext _context;
         private readonly IConfiguration _configuration;
+        private readonly IAuditClient _auditClient;
 
-        public UsersController(AuthDbContext context, IConfiguration configuration)
+        public UsersController(
+            AuthDbContext context,
+            IConfiguration configuration,
+            IAuditClient auditClient)
         {
             _context = context;
             _configuration = configuration;
+            _auditClient = auditClient;
         }
 
         [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginDto loginDto)
+        public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
             var sw = Stopwatch.StartNew();
             // This is the first EF Core query in the login flow. It asks SQL Server for
@@ -39,6 +46,20 @@ namespace CoreAPI.Controllers
             // password hasher, never compare raw passwords.
             if (user == null || user.PasswordHash != loginDto.Password)
             {
+                await _auditClient.RecordAsync(new AuditEventRequest
+                {
+                    EventType = "LoginFailed",
+                    EntityType = "User",
+                    EntityId = loginDto.Username,
+                    ActionBy = loginDto.Username,
+                    Summary = $"Login failed for user {loginDto.Username}.",
+                    PayloadJson = JsonSerializer.Serialize(new
+                    {
+                        loginDto.Username,
+                        Reason = "Invalid username or password"
+                    })
+                });
+
                 return Unauthorized("Invalid username or password");
             }
 
@@ -63,6 +84,20 @@ namespace CoreAPI.Controllers
                 signingCredentials: creds);
 
             Console.WriteLine($"Token creation took {sw.ElapsedMilliseconds} ms");
+
+            await _auditClient.RecordAsync(new AuditEventRequest
+            {
+                EventType = "LoginSucceeded",
+                EntityType = "User",
+                EntityId = user.Username,
+                ActionBy = user.Username,
+                Summary = $"Login succeeded for user {user.Username}.",
+                PayloadJson = JsonSerializer.Serialize(new
+                {
+                    user.Id,
+                    user.Username
+                })
+            });
 
             return Ok(new
             {

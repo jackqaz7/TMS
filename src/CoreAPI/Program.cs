@@ -30,6 +30,14 @@ builder.Services.AddDbContext<TmsDbContext>(options =>
 // and any future client receive the same API-side validation behavior.
 builder.Services.AddScoped<ITradeValidationService, TradeValidationService>();
 
+// CoreAPI writes audit events through HTTP so the Audit Service owns its own
+// database. This starts simple now and can later be replaced by Kafka publishing.
+builder.Services.AddHttpClient<IAuditClient, AuditClient>(client =>
+{
+    var baseUrl = builder.Configuration["AuditService:BaseUrl"] ?? "https://localhost:7204";
+    client.BaseAddress = new Uri(baseUrl);
+});
+
 // JWT bearer authentication tells ASP.NET Core how to read and validate the
 // Authorization: Bearer <token> header sent by the WPF client after login.
 builder.Services.AddAuthentication(options =>
