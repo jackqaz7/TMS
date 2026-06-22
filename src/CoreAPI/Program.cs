@@ -1,4 +1,5 @@
 ﻿using CoreAPI.Data;
+using CoreAPI.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -24,6 +25,10 @@ builder.Services.AddDbContext<AuthDbContext>(options =>
 // DbSet<Trade> operations used by TreasuryController.
 builder.Services.AddDbContext<TmsDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("TMS")));
+
+// TradeValidationService centralizes trade business validation so WPF, React,
+// and any future client receive the same API-side validation behavior.
+builder.Services.AddScoped<ITradeValidationService, TradeValidationService>();
 
 // JWT bearer authentication tells ASP.NET Core how to read and validate the
 // Authorization: Bearer <token> header sent by the WPF client after login.
@@ -91,3 +96,4 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+

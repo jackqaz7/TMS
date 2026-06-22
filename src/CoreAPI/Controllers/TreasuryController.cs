@@ -3,6 +3,7 @@ using System.Security.Claims;
 using CoreAPI.Data;
 using CoreAPI.Filters;
 using CoreAPI.Models;
+using CoreAPI.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,10 +17,14 @@ namespace CoreAPI.Controllers
     public class TreasuryController : ControllerBase
     {
         private readonly TmsDbContext _tmsDbContext;
+        private readonly ITradeValidationService _tradeValidationService;
 
-        public TreasuryController(TmsDbContext tmsDbContext)
+        public TreasuryController(
+            TmsDbContext tmsDbContext,
+            ITradeValidationService tradeValidationService)
         {
             _tmsDbContext = tmsDbContext;
+            _tradeValidationService = tradeValidationService;
         }
 
         [Route("Status")]
@@ -36,9 +41,88 @@ namespace CoreAPI.Controllers
             return Ok(new { service = "Treasury", transaction.Id });
         }
 
+
+        [HttpGet("fx-rates/latest")]
+        public async Task<ActionResult<FxRateResponse>> GetLatestFxRate(
+            [FromQuery] string fromCurrency,
+            [FromQuery] string toCurrency)
+        {
+            var from = fromCurrency?.Trim().ToUpperInvariant() ?? string.Empty;
+            var to = toCurrency?.Trim().ToUpperInvariant() ?? string.Empty;
+
+            if (!IsValidCurrencyCode(from) || !IsValidCurrencyCode(to))
+            {
+                return BadRequest(new { Message = "Both currencies must be valid 3-letter currency codes." });
+            }
+
+            if (from == to)
+            {
+                return Ok(new FxRateResponse
+                {
+                    FromCurrency = from,
+                    ToCurrency = to,
+                    Rate = 1,
+                    RateDate = DateTime.UtcNow.Date,
+                    Source = "Same currency",
+                    IsCrossRate = false
+                });
+            }
+
+            // First try an exact pair from the database, for example USD -> INR.
+            var directRate = await FindLatestStoredFxRate(from, to);
+
+            if (directRate != null)
+            {
+                return Ok(ToFxRateResponse(directRate, from, to, directRate.Rate, false));
+            }
+
+            // Then try the inverse pair. If DB has USD -> EUR, we can serve EUR -> USD
+            // as 1 / USD->EUR without storing a duplicate row.
+            var inverseRate = await FindLatestStoredFxRate(to, from);
+
+            if (inverseRate != null)
+            {
+                return Ok(ToFxRateResponse(inverseRate, from, to, 1 / inverseRate.Rate, true));
+            }
+
+            // Finally calculate a USD cross rate. With USD->EUR and USD->GBP stored:
+            // EUR->GBP = (USD->GBP) / (USD->EUR).
+            var usdToFrom = await FindLatestStoredFxRate("USD", from);
+            var usdToTo = await FindLatestStoredFxRate("USD", to);
+
+            if (usdToFrom == null || usdToTo == null)
+            {
+                return NotFound(new
+                {
+                    Message = $"No FX rate found for {from}->{to}, and USD cross-rate data is incomplete."
+                });
+            }
+
+            return Ok(new FxRateResponse
+            {
+                FromCurrency = from,
+                ToCurrency = to,
+                Rate = usdToTo.Rate / usdToFrom.Rate,
+                RateDate = usdToFrom.RateDate <= usdToTo.RateDate ? usdToFrom.RateDate : usdToTo.RateDate,
+                Source = $"USD cross rate from {usdToFrom.Source} / {usdToTo.Source}",
+                IsCrossRate = true
+            });
+        }
         [HttpPost("trades")]
         public async Task<ActionResult<TradeResponse>> CreateTrade([FromBody] CreateTradeRequest request)
         {
+            var validationErrors = _tradeValidationService.ValidateCreateTrade(request);
+
+            if (validationErrors.Count > 0)
+            {
+                return BadRequest(new
+                {
+                    Message = "Trade validation failed.",
+                    Errors = validationErrors
+                });
+            }
+
+            // CreatedBy is taken from the authenticated JWT so the client cannot fake audit data.
             var createdBy = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
                 ?? User.Identity?.Name
                 ?? "system";
@@ -126,6 +210,41 @@ namespace CoreAPI.Controllers
             return Ok(positions);
         }
 
+
+        private async Task<FxRate?> FindLatestStoredFxRate(string fromCurrency, string toCurrency)
+        {
+            // AsNoTracking is used because FX lookup is read-only. EF Core can skip
+            // change tracking, which makes simple read queries lighter.
+            return await _tmsDbContext.FxRates
+                .AsNoTracking()
+                .Where(r => r.FromCurrency == fromCurrency && r.ToCurrency == toCurrency)
+                .OrderByDescending(r => r.RateDate)
+                .ThenByDescending(r => r.Id)
+                .FirstOrDefaultAsync();
+        }
+
+        private static FxRateResponse ToFxRateResponse(
+            FxRate storedRate,
+            string fromCurrency,
+            string toCurrency,
+            decimal effectiveRate,
+            bool isCrossRate)
+        {
+            return new FxRateResponse
+            {
+                FromCurrency = fromCurrency,
+                ToCurrency = toCurrency,
+                Rate = effectiveRate,
+                RateDate = storedRate.RateDate,
+                Source = storedRate.Source,
+                IsCrossRate = isCrossRate
+            };
+        }
+
+        private static bool IsValidCurrencyCode(string currency)
+        {
+            return currency.Length == 3 && currency.All(char.IsLetter);
+        }
         private static TradeResponse ToResponse(Trade trade)
         {
             return new TradeResponse
@@ -163,3 +282,7 @@ namespace CoreAPI.Controllers
         }
     }
 }
+
+
+
+

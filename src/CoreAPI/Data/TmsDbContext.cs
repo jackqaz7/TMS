@@ -13,6 +13,10 @@ namespace CoreAPI.Data
         // Add/Find/LINQ operations here are translated into SQL by EF Core.
         public DbSet<Trade> Trades { get; set; }
 
+        // DbSet<FxRate> represents dbo.FxRates. The Create Trade UI uses this
+        // through the API to auto-calculate Amount2 from Amount1.
+        public DbSet<FxRate> FxRates { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Trade>(entity =>
@@ -42,6 +46,20 @@ namespace CoreAPI.Data
                 entity.Property(t => t.FarLegAmount1).HasColumnType("decimal(18, 2)");
                 entity.Property(t => t.FarLegAmount2).HasColumnType("decimal(18, 2)");
                 entity.Property(t => t.SwapPoints).HasColumnType("decimal(18, 8)");
+            });
+
+            modelBuilder.Entity<FxRate>(entity =>
+            {
+                entity.HasKey(r => r.Id);
+
+                // This index supports the common lookup pattern:
+                // latest rate for FromCurrency + ToCurrency.
+                entity.HasIndex(r => new { r.FromCurrency, r.ToCurrency, r.RateDate });
+
+                entity.Property(r => r.FromCurrency).HasMaxLength(3).IsFixedLength();
+                entity.Property(r => r.ToCurrency).HasMaxLength(3).IsFixedLength();
+                entity.Property(r => r.Rate).HasColumnType("decimal(18, 8)");
+                entity.Property(r => r.Source).HasMaxLength(50);
             });
         }
     }

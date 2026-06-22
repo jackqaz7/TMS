@@ -90,12 +90,14 @@
                     <StackPanel Grid.Column="0" Margin="0,0,12,0">
                         <TextBlock Text="Currency 1"/>
                         <ComboBox ItemsSource="{Binding Currencies}"
-                                  SelectedItem="{Binding Trade.Currency1, UpdateSourceTrigger=PropertyChanged}"/>
+                                  SelectedItem="{Binding Trade.Currency1, UpdateSourceTrigger=PropertyChanged}"
+                                  SelectionChanged="FxInput_Changed"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Margin="0,0,12,0">
                         <TextBlock Text="Amount 1"/>
-                        <TextBox Text="{Binding Trade.Amount1, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBox Text="{Binding Trade.Amount1, UpdateSourceTrigger=PropertyChanged}"
+                                 LostFocus="FxInput_Changed"/>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2">
@@ -106,7 +108,8 @@
                     <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,12,12,0">
                         <TextBlock Text="Currency 2"/>
                         <ComboBox ItemsSource="{Binding Currencies}"
-                                  SelectedItem="{Binding Trade.Currency2, UpdateSourceTrigger=PropertyChanged}"/>
+                                  SelectedItem="{Binding Trade.Currency2, UpdateSourceTrigger=PropertyChanged}"
+                                  SelectionChanged="FxInput_Changed"/>
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,12,12,0">
@@ -235,3 +238,5 @@
         </Grid>
     </ScrollViewer>
 </Window>
+
+
