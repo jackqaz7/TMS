@@ -34,3 +34,5 @@ publish/
 
 # Generated files
 *.generated.cs
+/Docs/Architecture
+/CODEX-INSTRUCTIONS.md
