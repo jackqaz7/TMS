@@ -80,6 +80,13 @@
                         Height="32"
                         Command="{Binding RefreshPositionsCommand}"/>
 
+                <Button DockPanel.Dock="Left"
+                Content="New Trade"
+        Width="100"
+        Height="32"
+        Margin="0,0,8,0"
+        Click="NewTrade_Click"/>
+
                 <TextBlock Text="{Binding StatusMessage}"
                            VerticalAlignment="Center"
                            Foreground="#5D6678"

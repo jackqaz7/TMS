@@ -4,31 +4,36 @@ namespace CoreAPI.Models
 {
     public class CreateTradeRequest
     {
-        [Required]
         public string TradeReference { get; set; } = string.Empty;
-
-        [Required]
+        public string TradeType { get; set; } = "FX_SPOT";
         public string Counterparty { get; set; } = string.Empty;
+        public string? CounterpartyBankAccount { get; set; }
 
-        [Required]
-        public string Instrument { get; set; } = string.Empty;
+        public string Currency1 { get; set; } = string.Empty;
+        public decimal Amount1 { get; set; }
+        public string Currency2 { get; set; } = string.Empty;
+        public decimal Amount2 { get; set; }
 
-        [Required]
-        [StringLength(3, MinimumLength = 3)]
-        public string Currency { get; set; } = string.Empty;
+        public decimal FxRateUsed { get; set; }
+        public DateTime RateDate { get; set; }
 
-        [Required]
-        [RegularExpression("BUY|SELL", ErrorMessage = "Side must be BUY or SELL.")]
-        public string Side { get; set; } = string.Empty;
-
-        [Range(0.01, double.MaxValue)]
-        public decimal Notional { get; set; }
-
-        [Range(0.000001, double.MaxValue)]
-        public decimal Rate { get; set; }
-
+        public string Side { get; set; } = "BUY";
         public DateTime TradeDate { get; set; }
-
         public DateTime SettlementDate { get; set; }
+
+        public decimal Fees { get; set; }
+        public string? Comments { get; set; }
+
+        public DateTime? NearLegDate { get; set; }
+        public decimal? NearLegRate { get; set; }
+        public decimal? NearLegAmount1 { get; set; }
+        public decimal? NearLegAmount2 { get; set; }
+
+        public DateTime? FarLegDate { get; set; }
+        public decimal? FarLegRate { get; set; }
+        public decimal? FarLegAmount1 { get; set; }
+        public decimal? FarLegAmount2 { get; set; }
+
+        public decimal? SwapPoints { get; set; }
     }
 }

@@ -38,5 +38,12 @@ namespace TMS_WPF_UI
             loginWindow.Show();
             this.Close();
         }
+
+        private void NewTrade_Click(object sender, RoutedEventArgs e)
+        {
+            var tradeWindow = new CreateTrade();
+            tradeWindow.Owner = this;
+            tradeWindow.ShowDialog();
+        }
     }
 }

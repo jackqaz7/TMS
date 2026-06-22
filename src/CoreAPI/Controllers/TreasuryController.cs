@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Security.Claims;
 using CoreAPI.Data;
 using CoreAPI.Filters;
 using CoreAPI.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace CoreAPI.Controllers
 {
@@ -31,45 +33,55 @@ namespace CoreAPI.Controllers
         [MethodFilter("POST")]
         public IActionResult ProcessTrade([FromBody] TransactionDto transaction)
         {
-            // Kept as a simple starter endpoint from the first API slice. New trade capture
-            // logic lives in POST /api/treasury/trades below.
             return Ok(new { service = "Treasury", transaction.Id });
         }
 
         [HttpPost("trades")]
         public async Task<ActionResult<TradeResponse>> CreateTrade([FromBody] CreateTradeRequest request)
         {
-            // API request DTOs are mapped into database entities instead of saving the
-            // request object directly. This keeps external contracts separate from storage.
+            var createdBy = User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                ?? User.Identity?.Name
+                ?? "system";
+
             var trade = new Trade
             {
                 TradeReference = request.TradeReference.Trim(),
+                TradeType = request.TradeType.Trim().ToUpperInvariant(),
                 Counterparty = request.Counterparty.Trim(),
-                Instrument = request.Instrument.Trim(),
-                Currency = request.Currency.Trim().ToUpperInvariant(),
+                CounterpartyBankAccount = request.CounterpartyBankAccount?.Trim(),
+                Currency1 = request.Currency1.Trim().ToUpperInvariant(),
+                Amount1 = request.Amount1,
+                Currency2 = request.Currency2.Trim().ToUpperInvariant(),
+                Amount2 = request.Amount2,
+                FxRateUsed = request.FxRateUsed,
+                RateDate = request.RateDate,
                 Side = request.Side.Trim().ToUpperInvariant(),
-                Notional = request.Notional,
-                Rate = request.Rate,
                 TradeDate = request.TradeDate,
                 SettlementDate = request.SettlementDate,
+                Fees = request.Fees,
+                Comments = request.Comments?.Trim(),
+                NearLegDate = request.NearLegDate,
+                NearLegRate = request.NearLegRate,
+                NearLegAmount1 = request.NearLegAmount1,
+                NearLegAmount2 = request.NearLegAmount2,
+                FarLegDate = request.FarLegDate,
+                FarLegRate = request.FarLegRate,
+                FarLegAmount1 = request.FarLegAmount1,
+                FarLegAmount2 = request.FarLegAmount2,
+                SwapPoints = request.SwapPoints,
+                CreatedBy = createdBy,
                 CreatedUtc = DateTime.UtcNow
             };
 
-            // Add marks the entity as new in EF Core's change tracker. SaveChangesAsync
-            // translates that pending change into an INSERT statement.
             _tmsDbContext.Trades.Add(trade);
             await _tmsDbContext.SaveChangesAsync();
 
-            // 201 Created is useful for REST clients because it returns the created object
-            // and points to the endpoint that can retrieve it later.
             return CreatedAtAction(nameof(GetTrade), new { id = trade.Id }, ToResponse(trade));
         }
 
         [HttpGet("trades")]
         public async Task<ActionResult<IEnumerable<TradeResponse>>> GetTrades()
         {
-            // This LINQ query is not executed until ToListAsync. EF Core converts the sort
-            // and projection into SQL where possible.
             var trades = await _tmsDbContext.Trades
                 .OrderByDescending(t => t.TradeDate)
                 .ThenByDescending(t => t.Id)
@@ -82,8 +94,6 @@ namespace CoreAPI.Controllers
         [HttpGet("trades/{id:int}")]
         public async Task<ActionResult<TradeResponse>> GetTrade(int id)
         {
-            // FindAsync searches by primary key. EF Core can return a tracked entity from
-            // memory first, or query the database if it is not already loaded.
             var trade = await _tmsDbContext.Trades.FindAsync(id);
 
             if (trade == null)
@@ -97,19 +107,17 @@ namespace CoreAPI.Controllers
         [HttpGet("positions")]
         public async Task<ActionResult<IEnumerable<PositionSummaryDto>>> GetPositions()
         {
-            // Position is a read model: it is calculated from trades, not stored directly.
-            // GroupBy lets SQL Server aggregate by currency before results return to .NET.
             var positions = await _tmsDbContext.Trades
-                .GroupBy(t => t.Currency)
+                .GroupBy(t => t.Currency1)
                 .Select(group => new PositionSummaryDto
                 {
                     Currency = group.Key,
-                    BuyNotional = group.Where(t => t.Side == "BUY").Sum(t => t.Notional),
-                    SellNotional = group.Where(t => t.Side == "SELL").Sum(t => t.Notional),
-                    NetNotional = group.Sum(t => t.Side == "BUY" ? t.Notional : -t.Notional),
-                    WeightedAverageRate = group.Sum(t => t.Notional) == 0
+                    BuyNotional = group.Where(t => t.Side == "BUY").Sum(t => t.Amount1),
+                    SellNotional = group.Where(t => t.Side == "SELL").Sum(t => t.Amount1),
+                    NetNotional = group.Sum(t => t.Side == "BUY" ? t.Amount1 : -t.Amount1),
+                    WeightedAverageRate = group.Sum(t => t.Amount1) == 0
                         ? 0
-                        : group.Sum(t => t.Notional * t.Rate) / group.Sum(t => t.Notional),
+                        : group.Sum(t => t.Amount1 * t.FxRateUsed) / group.Sum(t => t.Amount1),
                     TradeCount = group.Count()
                 })
                 .OrderBy(p => p.Currency)
@@ -120,22 +128,37 @@ namespace CoreAPI.Controllers
 
         private static TradeResponse ToResponse(Trade trade)
         {
-            // Response DTOs give the API freedom to shape output without exposing every
-            // database field or EF tracking detail to clients.
             return new TradeResponse
             {
                 Id = trade.Id,
                 TradeReference = trade.TradeReference,
+                TradeType = trade.TradeType,
                 Counterparty = trade.Counterparty,
-                Instrument = trade.Instrument,
-                Currency = trade.Currency,
+                CounterpartyBankAccount = trade.CounterpartyBankAccount,
+                Currency1 = trade.Currency1,
+                Amount1 = trade.Amount1,
+                Currency2 = trade.Currency2,
+                Amount2 = trade.Amount2,
+                FxRateUsed = trade.FxRateUsed,
+                RateDate = trade.RateDate,
                 Side = trade.Side,
-                Notional = trade.Notional,
-                Rate = trade.Rate,
-                LocalAmount = trade.Notional * trade.Rate,
                 TradeDate = trade.TradeDate,
                 SettlementDate = trade.SettlementDate,
-                CreatedUtc = trade.CreatedUtc
+                Fees = trade.Fees,
+                Comments = trade.Comments,
+                NearLegDate = trade.NearLegDate,
+                NearLegRate = trade.NearLegRate,
+                NearLegAmount1 = trade.NearLegAmount1,
+                NearLegAmount2 = trade.NearLegAmount2,
+                FarLegDate = trade.FarLegDate,
+                FarLegRate = trade.FarLegRate,
+                FarLegAmount1 = trade.FarLegAmount1,
+                FarLegAmount2 = trade.FarLegAmount2,
+                SwapPoints = trade.SwapPoints,
+                CreatedBy = trade.CreatedBy,
+                CreatedUtc = trade.CreatedUtc,
+                EditedBy = trade.EditedBy,
+                LastEditedUtc = trade.LastEditedUtc
             };
         }
     }

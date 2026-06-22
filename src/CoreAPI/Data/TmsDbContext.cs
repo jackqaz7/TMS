@@ -18,20 +18,30 @@ namespace CoreAPI.Data
             modelBuilder.Entity<Trade>(entity =>
             {
                 entity.HasKey(t => t.Id);
-
-                // TradeReference is unique because a real treasury trade should have one
-                // external/business identifier that prevents duplicate capture.
                 entity.HasIndex(t => t.TradeReference).IsUnique();
 
-                // Length and decimal precision are part of the database contract. Keeping
-                // them explicit avoids EF/Core SQL Server choosing broad defaults.
                 entity.Property(t => t.TradeReference).HasMaxLength(40);
+                entity.Property(t => t.TradeType).HasMaxLength(20);
                 entity.Property(t => t.Counterparty).HasMaxLength(120);
-                entity.Property(t => t.Instrument).HasMaxLength(40);
-                entity.Property(t => t.Currency).HasMaxLength(3);
+                entity.Property(t => t.CounterpartyBankAccount).HasMaxLength(50);
+                entity.Property(t => t.Currency1).HasMaxLength(3).IsFixedLength();
+                entity.Property(t => t.Currency2).HasMaxLength(3).IsFixedLength();
                 entity.Property(t => t.Side).HasMaxLength(4);
-                entity.Property(t => t.Notional).HasColumnType("decimal(18, 2)");
-                entity.Property(t => t.Rate).HasColumnType("decimal(18, 6)");
+                entity.Property(t => t.Comments).HasMaxLength(500);
+                entity.Property(t => t.CreatedBy).HasMaxLength(100);
+                entity.Property(t => t.EditedBy).HasMaxLength(100);
+
+                entity.Property(t => t.Amount1).HasColumnType("decimal(18, 2)");
+                entity.Property(t => t.Amount2).HasColumnType("decimal(18, 2)");
+                entity.Property(t => t.FxRateUsed).HasColumnType("decimal(18, 8)");
+                entity.Property(t => t.Fees).HasColumnType("decimal(18, 2)");
+                entity.Property(t => t.NearLegRate).HasColumnType("decimal(18, 8)");
+                entity.Property(t => t.NearLegAmount1).HasColumnType("decimal(18, 2)");
+                entity.Property(t => t.NearLegAmount2).HasColumnType("decimal(18, 2)");
+                entity.Property(t => t.FarLegRate).HasColumnType("decimal(18, 8)");
+                entity.Property(t => t.FarLegAmount1).HasColumnType("decimal(18, 2)");
+                entity.Property(t => t.FarLegAmount2).HasColumnType("decimal(18, 2)");
+                entity.Property(t => t.SwapPoints).HasColumnType("decimal(18, 8)");
             });
         }
     }
