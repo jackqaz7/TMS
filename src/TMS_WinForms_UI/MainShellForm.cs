@@ -49,6 +49,14 @@ namespace TMS_WinForms_UI
             };
             dashboardButton.Click += (_, _) => ShowDashboard();
 
+            var usersButton = new Button
+            {
+                Text = "Users and Dealers",
+                Dock = DockStyle.Top,
+                Height = 36
+            };
+            usersButton.Click += (_, _) => ShowUsersAndDealers();
+
             var logoutButton = new Button
             {
                 Text = "Logout",
@@ -58,6 +66,7 @@ namespace TMS_WinForms_UI
             logoutButton.Click += (_, _) => Logout();
 
             sidebar.Controls.Add(logoutButton);
+            sidebar.Controls.Add(usersButton);
             sidebar.Controls.Add(dashboardButton);
             sidebar.Controls.Add(title);
 
@@ -82,6 +91,17 @@ namespace TMS_WinForms_UI
             };
 
             _contentPanel.Controls.Add(_currentHost);
+        }
+
+        private void ShowUsersAndDealers()
+        {
+            _currentHost?.Dispose();
+            _currentHost = null;
+            _contentPanel.Controls.Clear();
+
+            // This screen is plain WinForms because it is a simple CRUD/admin form.
+            // It still goes through CoreAPI so API validation remains authoritative.
+            _contentPanel.Controls.Add(new UserDealerForm());
         }
 
         private void Logout()
