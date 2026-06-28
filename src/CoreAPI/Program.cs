@@ -130,6 +130,11 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+// Global API error handling: controllers still return expected errors such as
+// BadRequest/NotFound, while unexpected exceptions are logged and returned as
+// safe ProblemDetails JSON with a trace id.
+app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
+
 app.UseHttpsRedirection();
 
 // Order matters: Authentication identifies the user first; Authorization then
