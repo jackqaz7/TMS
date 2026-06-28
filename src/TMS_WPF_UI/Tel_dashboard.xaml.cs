@@ -5,38 +5,37 @@ using TMS_WPF_UI.ViewModel;
 namespace TMS_WPF_UI
 {
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    /// Interaction logic for Tel_dashboard.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class Tel_dashboard : Window
     {
         private readonly Dashboard _dashboard;
 
-        public MainWindow()
+        public Tel_dashboard()
         {
             InitializeComponent();
 
             _dashboard = new Dashboard();
 
-            // DataContext is the binding source for this window. XAML expressions such as
-            // {Binding Positions} and {Binding RefreshPositionsCommand} resolve here.
+            // This deliberately reuses the same view model as WPF_Dashboard. Only the
+            // visual controls change, which makes the WPF vs Telerik comparison fair.
             DataContext = _dashboard;
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            // Window_Loaded is an event handler, so async void is acceptable here. For normal
-            // methods prefer async Task, as used by Dashboard.LoadPositionsAsync.
+            // Telerik's RadBusyIndicator binds to IsLoading, so the loading state is still
+            // driven by the same async API call used by the native WPF dashboard.
             await _dashboard.LoadPositionsAsync();
         }
 
         private void Logout_Click(object sender, RoutedEventArgs e)
         {
-            // Clearing the token removes the client-side login session. The next protected
-            // API call will fail unless the user logs in again and receives a new JWT.
+            // Keep logout behavior identical to the native dashboard.
             SessionManager.JwtToken = null;
             var loginWindow = new Login();
             loginWindow.Show();
-            this.Close();
+            Close();
         }
 
         private void NewTrade_Click(object sender, RoutedEventArgs e)

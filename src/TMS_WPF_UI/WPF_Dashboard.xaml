@@ -1,4 +1,4 @@
-﻿<Window x:Class="TMS_WPF_UI.MainWindow"
+﻿<Window x:Class="TMS_WPF_UI.WPF_Dashboard"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -81,11 +81,18 @@
                         Command="{Binding RefreshPositionsCommand}"/>
 
                 <Button DockPanel.Dock="Left"
-                Content="New Trade"
-        Width="100"
-        Height="32"
-        Margin="0,0,8,0"
-        Click="NewTrade_Click"/>
+                        Content="New Trade"
+                        Width="100"
+                        Height="32"
+                        Margin="8,0,0,0"
+                        Click="NewTrade_Click"/>
+
+                <Button DockPanel.Dock="Left"
+                        Content="Telerik View"
+                        Width="112"
+                        Height="32"
+                        Margin="8,0,0,0"
+                        Click="TelerikDashboard_Click"/>
 
                 <TextBlock Text="{Binding StatusMessage}"
                            VerticalAlignment="Center"
@@ -123,3 +130,4 @@
         </Grid>
     </Grid>
 </Window>
+

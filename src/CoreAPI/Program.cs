@@ -30,6 +30,10 @@ builder.Services.AddDbContext<TmsDbContext>(options =>
 // and any future client receive the same API-side validation behavior.
 builder.Services.AddScoped<ITradeValidationService, TradeValidationService>();
 
+// Reconciliation runs as a batch workflow: EF Core loads trade snapshots async,
+// then in-memory matching is partitioned and processed with bounded parallelism.
+builder.Services.AddScoped<IReconciliationBatchService, ReconciliationBatchService>();
+
 // CoreAPI writes audit events through HTTP so the Audit Service owns its own
 // database. This starts simple now and can later be replaced by Kafka publishing.
 builder.Services.AddHttpClient<IAuditClient, AuditClient>(client =>

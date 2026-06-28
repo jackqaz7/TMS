@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Telerik.UI.for.Wpf.AllControls.Xaml" Version="2026.2.520" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\CoreAPI\CoreAPI.csproj" />
   </ItemGroup>
 

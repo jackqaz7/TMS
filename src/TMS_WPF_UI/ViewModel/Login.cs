@@ -85,7 +85,7 @@ namespace TMS_WPF_UI.ViewModel
                     SessionManager.JwtToken = result.Token;
                     Message = "Login successful!";
 
-                    var home = new MainWindow();
+                    var home = new WPF_Dashboard();
                     home.Show();
                     Application.Current.Windows[0]?.Close();
                 }
@@ -107,3 +107,4 @@ namespace TMS_WPF_UI.ViewModel
         }
     }
 }
+

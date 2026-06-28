@@ -37,6 +37,7 @@ namespace TMS_WPF_UI.ViewModel
         // Trade is the form backing object. XAML fields bind to properties like
         // Trade.TradeReference, Trade.Amount1, Trade.Currency1, etc.
         public CreateTradeRequest Trade { get; private set; } = CreateDefaultTrade();
+        
 
         public string Message
         {
