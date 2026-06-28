@@ -5,5 +5,6 @@
   <Project Path="src/CoreAPI/CoreAPI.csproj" Id="ffd61b4b-cf4f-49b4-bcc4-a102e9df10f5" />
   <Project Path="src/AuditService/AuditService.csproj" Id="0fbdd4d2-5a6a-4f4f-9a4d-4b9d9f9aa001" />
   <Project Path="src/TMS_WPF_UI/TMS_WPF_UI.csproj" Id="171dab9e-013d-4569-b4e2-79c60d19fb22" />
+  <Project Path="src/TMS_WinForms_UI/TMS_WinForms_UI.csproj" Id="48c86218-b2fa-4f41-9984-e5b35b8f5796" />
   <Project Path="tests/CoreAPI.Tests/CoreAPI.Tests.csproj" Id="d6c1e75e-812d-4c84-b55a-24f1a0a2c708" />
 </Solution>

@@ -1,9 +1,0 @@
-﻿<Application x:Class="TMS_WPF_UI.App"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:TMS_WPF_UI"
-             StartupUri="Login.xaml">
-    <Application.Resources>
-         
-    </Application.Resources>
-</Application>

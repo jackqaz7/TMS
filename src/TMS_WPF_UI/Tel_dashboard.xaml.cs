@@ -1,5 +1,4 @@
 ﻿using System.Windows;
-using TMS_WPF_UI.Helpers;
 using TMS_WPF_UI.ViewModel;
 
 namespace TMS_WPF_UI
@@ -17,24 +16,22 @@ namespace TMS_WPF_UI
 
             _dashboard = new Dashboard();
 
-            // This deliberately reuses the same view model as WPF_Dashboard. Only the
-            // visual controls change, which makes the WPF vs Telerik comparison fair.
+            // This deliberately reuses the same view model as DashboardControl. Only
+            // the visual controls change, which makes the WPF vs Telerik comparison fair.
             DataContext = _dashboard;
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
             // Telerik's RadBusyIndicator binds to IsLoading, so the loading state is still
-            // driven by the same async API call used by the native WPF dashboard.
+            // driven by the same async API call used by the hosted dashboard control.
             await _dashboard.LoadPositionsAsync();
         }
 
-        private void Logout_Click(object sender, RoutedEventArgs e)
+        private void Close_Click(object sender, RoutedEventArgs e)
         {
-            // Keep logout behavior identical to the native dashboard.
-            SessionManager.JwtToken = null;
-            var loginWindow = new Login();
-            loginWindow.Show();
+            // The WinForms shell owns login/logout. This secondary WPF window only
+            // closes itself so it stays reusable as a hosted component.
             Close();
         }
 

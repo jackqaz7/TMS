@@ -54,17 +54,17 @@
 
             <DockPanel Grid.Row="0" LastChildFill="True" Margin="0,0,0,18">
                 <telerik:RadButton DockPanel.Dock="Right"
-                                   Content="Logout"
+                                   Content="Close"
                                    Width="92"
                                    Height="32"
-                                   Click="Logout_Click"/>
+                                   Click="Close_Click"/>
 
                 <StackPanel>
                     <TextBlock Text="Treasury Positions"
                                FontSize="26"
                                FontWeight="SemiBold"
                                Foreground="#172033"/>
-                    <TextBlock Text="Telerik replica of the native WPF dashboard"
+                    <TextBlock Text="Telerik replica of the hosted WPF dashboard control"
                                Foreground="#5D6678"
                                Margin="0,4,0,0"/>
                 </StackPanel>
@@ -124,7 +124,7 @@
             </telerik:RadBusyIndicator>
 
             <TextBlock Grid.Row="3"
-                       Text="Same data path as WPF_Dashboard: SQL Server -> EF Core -> ASP.NET Core REST -> JWT-authenticated WPF client"
+                       Text="Same hosted path: WinForms shell -> WPF component -> ASP.NET Core REST -> SQL Server"
                        Foreground="#7A8496"
                        Margin="0,12,0,0"/>
         </Grid>
