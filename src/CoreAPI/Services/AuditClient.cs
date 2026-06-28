@@ -1,16 +1,15 @@
-using System.Net.Http.Json;
 using CoreAPI.Models;
 
 namespace CoreAPI.Services
 {
     public class AuditClient : IAuditClient
     {
-        private readonly HttpClient _httpClient;
+        private readonly IAuditEventQueue _queue;
         private readonly ILogger<AuditClient> _logger;
 
-        public AuditClient(HttpClient httpClient, ILogger<AuditClient> logger)
+        public AuditClient(IAuditEventQueue queue, ILogger<AuditClient> logger)
         {
-            _httpClient = httpClient;
+            _queue = queue;
             _logger = logger;
         }
 
@@ -18,22 +17,17 @@ namespace CoreAPI.Services
         {
             try
             {
-                // Audit is intentionally non-blocking for the business workflow:
-                // a trade save should not be rolled back just because the audit
-                // microservice is temporarily offline.
-                var response = await _httpClient.PostAsJsonAsync("api/audit-events", auditEvent, cancellationToken);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogWarning(
-                        "Audit Service returned {StatusCode} for event {EventType}",
-                        response.StatusCode,
-                        auditEvent.EventType);
-                }
+                // Producer side of the producer/consumer pattern. API workflows only
+                // enqueue audit facts; the background consumer performs the HTTP call.
+                await _queue.QueueAsync(auditEvent, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Audit Service call failed for event {EventType}", auditEvent.EventType);
+                _logger.LogWarning(ex, "Audit event enqueue failed for event {EventType}", auditEvent.EventType);
             }
         }
     }

@@ -1,3 +1,8 @@
+using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.Integration;
 using TMS_WPF_UI;
@@ -7,7 +12,11 @@ namespace TMS_WinForms_UI
 {
     public class MainShellForm : Form
     {
+        private const string CoreApiBaseAddress = "https://localhost:7104/api/";
+
         private readonly Panel _contentPanel = new();
+        private readonly Label _statusLabel = new();
+        private readonly Button _logButton = new();
         private ElementHost? _currentHost;
 
         public MainShellForm()
@@ -65,6 +74,16 @@ namespace TMS_WinForms_UI
             };
             reconciliationButton.Click += (_, _) => ShowReconciliation();
 
+            _logButton.Text = "Log";
+            _logButton.Dock = DockStyle.Top;
+            _logButton.Height = 36;
+            _logButton.Click += async (_, _) => await GenerateAuditLogEventsAsync();
+
+            _statusLabel.Dock = DockStyle.Bottom;
+            _statusLabel.Height = 72;
+            _statusLabel.ForeColor = System.Drawing.Color.DarkSlateGray;
+            _statusLabel.Text = "Ready";
+
             var logoutButton = new Button
             {
                 Text = "Logout",
@@ -74,6 +93,8 @@ namespace TMS_WinForms_UI
             logoutButton.Click += (_, _) => Logout();
 
             sidebar.Controls.Add(logoutButton);
+            sidebar.Controls.Add(_statusLabel);
+            sidebar.Controls.Add(_logButton);
             sidebar.Controls.Add(reconciliationButton);
             sidebar.Controls.Add(usersButton);
             sidebar.Controls.Add(dashboardButton);
@@ -124,12 +145,66 @@ namespace TMS_WinForms_UI
             _contentPanel.Controls.Add(new ReconciliationForm());
         }
 
+        private async Task GenerateAuditLogEventsAsync()
+        {
+            _logButton.Enabled = false;
+            _statusLabel.Text = "Queueing 50 log events...";
+
+            try
+            {
+                using var client = CreateAuthorizedClient();
+
+                // One click produces 50 audit events on the API. If the bounded
+                // Channel<T> queue fills, this call slows down instead of dropping work.
+                var response = await client.PostAsync("audit-log-test/button-click", content: null);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var body = await response.Content.ReadAsStringAsync();
+                    _statusLabel.ForeColor = System.Drawing.Color.Firebrick;
+                    _statusLabel.Text = $"{(int)response.StatusCode}: {body}";
+                    return;
+                }
+
+                var result = await response.Content.ReadFromJsonAsync<AuditLogButtonResponse>();
+
+                _statusLabel.ForeColor = System.Drawing.Color.DarkGreen;
+                _statusLabel.Text = result == null
+                    ? "Queued 50 log events."
+                    : $"Queued {result.EventsQueued} events in {result.EnqueueElapsedMilliseconds} ms.";
+            }
+            catch (Exception ex)
+            {
+                _statusLabel.ForeColor = System.Drawing.Color.Firebrick;
+                _statusLabel.Text = $"Log failed: {ex.Message}";
+            }
+            finally
+            {
+                _logButton.Enabled = true;
+            }
+        }
+
+        private HttpClient CreateAuthorizedClient()
+        {
+            var client = new HttpClient { BaseAddress = new System.Uri(CoreApiBaseAddress) };
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", SessionManager.JwtToken);
+
+            return client;
+        }
+
         private void Logout()
         {
             SessionManager.JwtToken = null;
             var login = new LoginForm();
             login.Show();
             Close();
+        }
+
+        private sealed class AuditLogButtonResponse
+        {
+            public int EventsQueued { get; set; }
+            public long EnqueueElapsedMilliseconds { get; set; }
         }
     }
 }

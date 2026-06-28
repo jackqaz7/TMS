@@ -59,7 +59,7 @@ namespace TMS_WinForms_UI
                 Text = "Reconciliation",
                 AutoSize = true,
                 Font = new System.Drawing.Font(Font.FontFamily, 16, System.Drawing.FontStyle.Bold),
-                Margin = new Padding(0, 0, 0, 12)
+                Margin = new Padding(0, 0, 0, 6)
             };
             root.Controls.Add(title, 0, 0);
 
@@ -82,12 +82,20 @@ namespace TMS_WinForms_UI
 
         private Control BuildSettingsPanel()
         {
+            var groupBox = new GroupBox
+            {
+                Text = "Run settings",
+                Dock = DockStyle.Top,
+                Height = 86,
+                Padding = new Padding(10),
+                Margin = new Padding(0, 0, 0, 12)
+            };
+
             var settings = new FlowLayoutPanel
             {
-                Dock = DockStyle.Top,
-                AutoSize = true,
+                Dock = DockStyle.Fill,
                 WrapContents = true,
-                Margin = new Padding(0, 0, 0, 12)
+                Padding = new Padding(0, 2, 0, 0)
             };
 
             _fromDatePicker.Value = DateTime.Today.AddDays(-7);
@@ -98,21 +106,29 @@ namespace TMS_WinForms_UI
             ConfigureNumeric(_parallelismInput, 1, 16, 0, 4);
 
             _runButton.Text = "Run";
-            _runButton.Width = 86;
+            _runButton.Width = 92;
+            _runButton.Height = 30;
+            _runButton.Margin = new Padding(8, 17, 4, 0);
             _runButton.Click += async (_, _) => await RunReconciliationAsync();
 
             _cancelButton.Text = "Cancel";
-            _cancelButton.Width = 86;
+            _cancelButton.Width = 92;
+            _cancelButton.Height = 30;
+            _cancelButton.Margin = new Padding(4, 17, 4, 0);
             _cancelButton.Enabled = false;
             _cancelButton.Click += (_, _) => _runCancellation?.Cancel();
 
             _loadSampleScenarioButton.Text = "Load Sample";
-            _loadSampleScenarioButton.Width = 104;
+            _loadSampleScenarioButton.Width = 116;
+            _loadSampleScenarioButton.Height = 30;
+            _loadSampleScenarioButton.Margin = new Padding(4, 17, 4, 0);
             _loadSampleScenarioButton.Click += (_, _) => LoadSampleScenario();
 
             _progressBar.Style = ProgressBarStyle.Marquee;
             _progressBar.Width = 140;
-            _progressBar.Visible = false;
+            _progressBar.Height = 22;
+            _progressBar.Margin = new Padding(8, 21, 0, 0);
+            _progressBar.MarqueeAnimationSpeed = 0;
 
             settings.Controls.Add(CreateLabeledControl("From", _fromDatePicker));
             settings.Controls.Add(CreateLabeledControl("To", _toDatePicker));
@@ -124,7 +140,8 @@ namespace TMS_WinForms_UI
             settings.Controls.Add(_loadSampleScenarioButton);
             settings.Controls.Add(_progressBar);
 
-            return settings;
+            groupBox.Controls.Add(settings);
+            return groupBox;
         }
 
         private static void ConfigureNumeric(
@@ -138,7 +155,7 @@ namespace TMS_WinForms_UI
             input.Maximum = maximum;
             input.DecimalPlaces = decimalPlaces;
             input.Value = value;
-            input.Width = 86;
+            input.Width = 96;
         }
 
         private static Control CreateLabeledControl(string labelText, Control control)
@@ -147,10 +164,10 @@ namespace TMS_WinForms_UI
             {
                 AutoSize = true,
                 FlowDirection = FlowDirection.TopDown,
-                Margin = new Padding(0, 0, 12, 0)
+                Margin = new Padding(0, 0, 14, 0)
             };
 
-            panel.Controls.Add(new Label { Text = labelText, AutoSize = true });
+            panel.Controls.Add(new Label { Text = labelText, AutoSize = true, ForeColor = System.Drawing.Color.DimGray });
             panel.Controls.Add(control);
 
             return panel;
@@ -162,7 +179,8 @@ namespace TMS_WinForms_UI
             {
                 Text = title,
                 Dock = DockStyle.Fill,
-                Padding = new Padding(8)
+                Padding = new Padding(10),
+                Margin = new Padding(0, 0, 0, 12)
             };
 
             child.Dock = DockStyle.Fill;
@@ -174,20 +192,71 @@ namespace TMS_WinForms_UI
         private void ConfigureLedgerGrid()
         {
             _ledgerGrid.Dock = DockStyle.Fill;
-            _ledgerGrid.AutoGenerateColumns = true;
+            _ledgerGrid.BackgroundColor = System.Drawing.Color.White;
+            _ledgerGrid.BorderStyle = BorderStyle.None;
+            _ledgerGrid.AutoGenerateColumns = false;
             _ledgerGrid.AllowUserToAddRows = true;
             _ledgerGrid.AllowUserToDeleteRows = true;
+            _ledgerGrid.ReadOnly = false;
+            _ledgerGrid.EditMode = DataGridViewEditMode.EditOnKeystrokeOrF2;
+            _ledgerGrid.RowHeadersVisible = false;
+            _ledgerGrid.AllowUserToResizeRows = false;
+            _ledgerGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+            _ledgerGrid.AlternatingRowsDefaultCellStyle.BackColor = System.Drawing.Color.FromArgb(248, 250, 252);
             _ledgerGrid.DataSource = _ledgerRows;
+
+            _ledgerGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = "External Reference",
+                DataPropertyName = nameof(LedgerEntryRow.ExternalReference),
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
+                MinimumWidth = 160
+            });
+
+            _ledgerGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Currency",
+                DataPropertyName = nameof(LedgerEntryRow.Currency),
+                Width = 90
+            });
+
+            _ledgerGrid.Columns.Add(new DataGridViewComboBoxColumn
+            {
+                HeaderText = "Side",
+                DataPropertyName = nameof(LedgerEntryRow.Side),
+                DataSource = new[] { "BUY", "SELL" },
+                Width = 90
+            });
+
+            _ledgerGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Amount",
+                DataPropertyName = nameof(LedgerEntryRow.Amount),
+                Width = 110
+            });
+
+            _ledgerGrid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = "Settlement Date",
+                DataPropertyName = nameof(LedgerEntryRow.SettlementDate),
+                Width = 140
+            });
         }
 
         private void ConfigureResultsGrid()
         {
             _resultsGrid.Dock = DockStyle.Fill;
+            _resultsGrid.BackgroundColor = System.Drawing.Color.White;
+            _resultsGrid.BorderStyle = BorderStyle.None;
             _resultsGrid.AutoGenerateColumns = false;
             _resultsGrid.AllowUserToAddRows = false;
             _resultsGrid.AllowUserToDeleteRows = false;
             _resultsGrid.ReadOnly = true;
             _resultsGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            _resultsGrid.RowHeadersVisible = false;
+            _resultsGrid.AllowUserToResizeRows = false;
+            _resultsGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells;
+            _resultsGrid.AlternatingRowsDefaultCellStyle.BackColor = System.Drawing.Color.FromArgb(248, 250, 252);
             _resultsGrid.DataSource = _resultRows;
 
             AddResultColumn("Currency", nameof(ReconciliationResultRow.Currency), 80);
@@ -414,11 +483,17 @@ namespace TMS_WinForms_UI
 
         private void SetBusy(bool isBusy)
         {
+            SuspendLayout();
+
             _runButton.Enabled = !isBusy;
             _cancelButton.Enabled = isBusy;
             _loadSampleScenarioButton.Enabled = !isBusy;
-            _progressBar.Visible = isBusy;
+            // Keep the progress bar visible so the Run settings panel does not
+            // resize/reflow when a reconciliation starts or finishes.
+            _progressBar.MarqueeAnimationSpeed = isBusy ? 30 : 0;
             _ledgerGrid.Enabled = !isBusy;
+
+            ResumeLayout();
         }
 
         private void SetSummary(string message, bool isError)
@@ -429,16 +504,16 @@ namespace TMS_WinForms_UI
             _summaryLabel.Text = message;
         }
 
-        private sealed class LedgerEntryRow
+        public sealed class LedgerEntryRow
         {
             public string ExternalReference { get; set; } = string.Empty;
             public string Currency { get; set; } = string.Empty;
-            public string Side { get; set; } = string.Empty;
+            public string Side { get; set; } = "BUY";
             public decimal Amount { get; set; }
             public DateTime SettlementDate { get; set; } = DateTime.Today;
         }
 
-        private sealed class ReconciliationResultRow
+        public sealed class ReconciliationResultRow
         {
             public string Currency { get; set; } = string.Empty;
             public string SettlementDate { get; set; } = string.Empty;

@@ -61,9 +61,9 @@ namespace TMS_WinForms_UI
             root.SetColumnSpan(title, 2);
 
             ConfigureGrid();
-            root.Controls.Add(_usersGrid, 0, 1);
+            root.Controls.Add(BuildGroupBox("Existing users", _usersGrid, new Padding(0, 0, 16, 0)), 0, 1);
 
-            root.Controls.Add(BuildEditorPanel(), 1, 1);
+            root.Controls.Add(BuildGroupBox("User details", BuildEditorPanel(), Padding.Empty), 1, 1);
 
             _messageLabel.AutoSize = true;
             _messageLabel.ForeColor = System.Drawing.Color.Firebrick;
@@ -77,6 +77,8 @@ namespace TMS_WinForms_UI
         private void ConfigureGrid()
         {
             _usersGrid.Dock = DockStyle.Fill;
+            _usersGrid.BackgroundColor = System.Drawing.Color.White;
+            _usersGrid.BorderStyle = BorderStyle.None;
             _usersGrid.AutoGenerateColumns = false;
             _usersGrid.AllowUserToAddRows = false;
             _usersGrid.AllowUserToDeleteRows = false;
@@ -84,6 +86,9 @@ namespace TMS_WinForms_UI
             _usersGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             _usersGrid.MultiSelect = false;
             _usersGrid.RowHeadersVisible = false;
+            _usersGrid.AllowUserToResizeRows = false;
+            _usersGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+            _usersGrid.AlternatingRowsDefaultCellStyle.BackColor = System.Drawing.Color.FromArgb(248, 250, 252);
 
             _usersGrid.Columns.Add(new DataGridViewTextBoxColumn
             {
@@ -114,16 +119,13 @@ namespace TMS_WinForms_UI
             var editor = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(16, 0, 0, 0),
-                ColumnCount = 1,
-                RowCount = 11
+                Padding = new Padding(8),
+                ColumnCount = 2,
+                RowCount = 6
             };
 
-            editor.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            editor.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            editor.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            editor.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            editor.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            editor.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 92));
+            editor.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             editor.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             editor.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             editor.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -131,30 +133,34 @@ namespace TMS_WinForms_UI
             editor.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             editor.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-            editor.Controls.Add(new Label { Text = "Id", AutoSize = true });
+            editor.Controls.Add(CreateFieldLabel("Id"), 0, 0);
             _idTextBox.ReadOnly = true;
-            _idTextBox.Dock = DockStyle.Top;
-            editor.Controls.Add(_idTextBox);
+            _idTextBox.Dock = DockStyle.Fill;
+            editor.Controls.Add(_idTextBox, 1, 0);
 
-            editor.Controls.Add(new Label { Text = "Username", AutoSize = true, Margin = new Padding(0, 12, 0, 0) });
-            _usernameTextBox.Dock = DockStyle.Top;
-            editor.Controls.Add(_usernameTextBox);
+            editor.Controls.Add(CreateFieldLabel("Username"), 0, 1);
+            _usernameTextBox.Dock = DockStyle.Fill;
+            _usernameTextBox.Margin = new Padding(0, 8, 0, 0);
+            editor.Controls.Add(_usernameTextBox, 1, 1);
 
-            editor.Controls.Add(new Label { Text = "Password", AutoSize = true, Margin = new Padding(0, 12, 0, 0) });
-            _passwordTextBox.Dock = DockStyle.Top;
+            editor.Controls.Add(CreateFieldLabel("Password"), 0, 2);
+            _passwordTextBox.Dock = DockStyle.Fill;
+            _passwordTextBox.Margin = new Padding(0, 8, 0, 0);
             _passwordTextBox.UseSystemPasswordChar = true;
-            editor.Controls.Add(_passwordTextBox);
+            editor.Controls.Add(_passwordTextBox, 1, 2);
 
-            editor.Controls.Add(new Label { Text = "Role", AutoSize = true, Margin = new Padding(0, 12, 0, 0) });
-            _roleComboBox.Dock = DockStyle.Top;
-            _roleComboBox.DropDownStyle = ComboBoxStyle.DropDown;
+            editor.Controls.Add(CreateFieldLabel("Role"), 0, 3);
+            _roleComboBox.Dock = DockStyle.Fill;
+            _roleComboBox.Margin = new Padding(0, 8, 0, 0);
+            _roleComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
             _roleComboBox.Items.AddRange(new object[] { "Admin", "Dealer", "Viewer" });
-            editor.Controls.Add(_roleComboBox);
+            editor.Controls.Add(_roleComboBox, 1, 3);
 
             var buttonPanel = new FlowLayoutPanel
             {
-                Dock = DockStyle.Top,
+                Dock = DockStyle.Fill,
                 AutoSize = true,
+                WrapContents = true,
                 Margin = new Padding(0, 16, 0, 0)
             };
 
@@ -171,18 +177,45 @@ namespace TMS_WinForms_UI
             buttonPanel.Controls.Add(_updateButton);
             buttonPanel.Controls.Add(_deleteButton);
             buttonPanel.Controls.Add(_clearButton);
-            editor.Controls.Add(buttonPanel);
+            editor.Controls.Add(buttonPanel, 1, 4);
 
             var note = new Label
             {
                 Text = "Leave password blank when updating to keep the current password.",
-                AutoSize = true,
+                Dock = DockStyle.Top,
                 ForeColor = System.Drawing.Color.DimGray,
                 Margin = new Padding(0, 12, 0, 0)
             };
-            editor.Controls.Add(note);
+            editor.Controls.Add(note, 1, 5);
 
             return editor;
+        }
+
+        private static Label CreateFieldLabel(string text)
+        {
+            return new Label
+            {
+                Text = text,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(0, 10, 12, 0)
+            };
+        }
+
+        private static Control BuildGroupBox(string title, Control child, Padding margin)
+        {
+            var groupBox = new GroupBox
+            {
+                Text = title,
+                Dock = DockStyle.Fill,
+                Padding = new Padding(10),
+                Margin = margin
+            };
+
+            child.Dock = DockStyle.Fill;
+            groupBox.Controls.Add(child);
+
+            return groupBox;
         }
 
         private static void ConfigureButton(Button button, string text, Func<Task> action)

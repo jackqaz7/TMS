@@ -34,9 +34,13 @@ builder.Services.AddScoped<ITradeValidationService, TradeValidationService>();
 // then in-memory matching is partitioned and processed with bounded parallelism.
 builder.Services.AddScoped<IReconciliationBatchService, ReconciliationBatchService>();
 
-// CoreAPI writes audit events through HTTP so the Audit Service owns its own
-// database. This starts simple now and can later be replaced by Kafka publishing.
-builder.Services.AddHttpClient<IAuditClient, AuditClient>(client =>
+// Audit uses a producer/consumer flow inside CoreAPI:
+// controllers produce events into a Channel<T>, and a hosted consumer posts them
+// to AuditService. Later the Channel<T> can be replaced by Kafka/RabbitMQ.
+builder.Services.AddSingleton<IAuditEventQueue, ChannelAuditEventQueue>();
+builder.Services.AddSingleton<IAuditClient, AuditClient>();
+builder.Services.AddHostedService<AuditEventConsumer>();
+builder.Services.AddHttpClient("AuditService", client =>
 {
     var baseUrl = builder.Configuration["AuditService:BaseUrl"] ?? "https://localhost:7204";
     client.BaseAddress = new Uri(baseUrl);

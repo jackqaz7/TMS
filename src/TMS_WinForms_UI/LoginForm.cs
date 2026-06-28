@@ -15,80 +15,135 @@ namespace TMS_WinForms_UI
         private readonly TextBox _usernameTextBox = new();
         private readonly TextBox _passwordTextBox = new();
         private readonly Button _loginButton = new();
-        private readonly Label _messageLabel = new();
-        private readonly ProgressBar _progressBar = new();
+        private readonly ToolStripStatusLabel _statusLabel = new();
+        private readonly ToolStripProgressBar _statusProgressBar = new();
+        private readonly Panel _loginPanel = new();
 
         public LoginForm()
         {
             Text = "TMS Login";
             StartPosition = FormStartPosition.CenterScreen;
-            Width = 420;
-            Height = 260;
-            MinimumSize = new System.Drawing.Size(420, 260);
+            ClientSize = new System.Drawing.Size(820, 500);
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+            MaximizeBox = false;
+            AcceptButton = _loginButton;
 
             BuildLayout();
         }
 
         private void BuildLayout()
         {
+            var contentPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(36),
+                BackColor = System.Drawing.Color.White
+            };
+
             var root = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(24),
                 ColumnCount = 2,
                 RowCount = 5
             };
 
-            root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 110));
+            root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 128));
             root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
             var title = new Label
             {
                 Text = "Treasury Management System",
                 AutoSize = true,
-                Font = new System.Drawing.Font(Font.FontFamily, 12, System.Drawing.FontStyle.Bold),
-                Margin = new Padding(0, 0, 0, 18)
+                Font = new System.Drawing.Font(Font.FontFamily, 18, System.Drawing.FontStyle.Bold),
+                Margin = new Padding(0, 0, 0, 8)
             };
 
             root.Controls.Add(title, 0, 0);
             root.SetColumnSpan(title, 2);
 
-            root.Controls.Add(new Label { Text = "Username", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 1);
-            _usernameTextBox.Dock = DockStyle.Fill;
-            root.Controls.Add(_usernameTextBox, 1, 1);
+            var subtitle = new Label
+            {
+                Text = "Sign in with your CoreAPI user account.",
+                AutoSize = true,
+                Font = new System.Drawing.Font(Font.FontFamily, 10),
+                ForeColor = System.Drawing.Color.DimGray,
+                Margin = new Padding(0, 0, 0, 24)
+            };
+            root.Controls.Add(subtitle, 0, 1);
+            root.SetColumnSpan(subtitle, 2);
 
-            root.Controls.Add(new Label { Text = "Password", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 2);
+            root.Controls.Add(new Label { Text = "Username", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 2);
+            _usernameTextBox.Dock = DockStyle.Fill;
+            _usernameTextBox.Font = new System.Drawing.Font(Font.FontFamily, 11);
+            _usernameTextBox.Margin = new Padding(0, 0, 0, 14);
+            root.Controls.Add(_usernameTextBox, 1, 2);
+
+            root.Controls.Add(new Label { Text = "Password", AutoSize = true, Anchor = AnchorStyles.Left }, 0, 3);
             _passwordTextBox.Dock = DockStyle.Fill;
+            _passwordTextBox.Font = new System.Drawing.Font(Font.FontFamily, 11);
             _passwordTextBox.UseSystemPasswordChar = true;
-            root.Controls.Add(_passwordTextBox, 1, 2);
+            root.Controls.Add(_passwordTextBox, 1, 3);
 
             _loginButton.Text = "Login";
-            _loginButton.Width = 90;
-            _loginButton.Margin = new Padding(0, 14, 0, 0);
+            _loginButton.Width = 132;
+            _loginButton.Height = 38;
+            _loginButton.Font = new System.Drawing.Font(Font.FontFamily, 10);
+            _loginButton.Margin = new Padding(0, 24, 0, 0);
             _loginButton.Click += async (_, _) => await LoginAsync();
-            root.Controls.Add(_loginButton, 1, 3);
+            root.Controls.Add(_loginButton, 1, 4);
 
-            _progressBar.Style = ProgressBarStyle.Marquee;
-            _progressBar.Visible = false;
-            _progressBar.Dock = DockStyle.Fill;
-            _progressBar.Margin = new Padding(0, 10, 0, 0);
-            root.Controls.Add(_progressBar, 1, 4);
+            var statusStrip = new StatusStrip
+            {
+                Dock = DockStyle.Bottom,
+                SizingGrip = false
+            };
 
-            _messageLabel.ForeColor = System.Drawing.Color.Firebrick;
-            _messageLabel.AutoSize = true;
-            _messageLabel.Margin = new Padding(0, 10, 0, 0);
-            root.Controls.Add(_messageLabel, 0, 4);
+            _statusLabel.Text = "Ready";
+            _statusLabel.Spring = true;
+            _statusLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
 
-            Controls.Add(root);
+            _statusProgressBar.Style = ProgressBarStyle.Marquee;
+            _statusProgressBar.Visible = false;
+            _statusProgressBar.Width = 140;
+
+            statusStrip.Items.Add(_statusLabel);
+            statusStrip.Items.Add(_statusProgressBar);
+
+            _loginPanel.Width = 700;
+            _loginPanel.Height = 290;
+            _loginPanel.Controls.Add(root);
+
+            // Keep the login controls visually grouped instead of letting the
+            // TableLayoutPanel stretch tiny default controls across a large window.
+            contentPanel.Controls.Add(_loginPanel);
+            contentPanel.Resize += (_, _) => CenterLoginPanel(contentPanel);
+            CenterLoginPanel(contentPanel);
+
+            Controls.Add(contentPanel);
+            Controls.Add(statusStrip);
+        }
+
+        private void CenterLoginPanel(Control parent)
+        {
+            var x = Math.Max(parent.Padding.Left, (parent.ClientSize.Width - _loginPanel.Width) / 2);
+            var y = Math.Max(parent.Padding.Top, (parent.ClientSize.Height - _loginPanel.Height) / 2);
+            _loginPanel.Location = new System.Drawing.Point(x, y);
         }
 
         private async Task LoginAsync()
         {
+            if (string.IsNullOrWhiteSpace(_usernameTextBox.Text) ||
+                string.IsNullOrWhiteSpace(_passwordTextBox.Text))
+            {
+                SetBusy(false, "Username and password are required.");
+                return;
+            }
+
             SetBusy(true, "Signing in...");
 
             try
@@ -134,8 +189,11 @@ namespace TMS_WinForms_UI
         private void SetBusy(bool isBusy, string message)
         {
             _loginButton.Enabled = !isBusy;
-            _progressBar.Visible = isBusy;
-            _messageLabel.Text = message;
+            _usernameTextBox.Enabled = !isBusy;
+            _passwordTextBox.Enabled = !isBusy;
+            _statusProgressBar.Visible = isBusy;
+            _statusLabel.ForeColor = isBusy ? System.Drawing.Color.DarkSlateGray : System.Drawing.Color.Firebrick;
+            _statusLabel.Text = message;
         }
 
         private sealed class LoginResponse
