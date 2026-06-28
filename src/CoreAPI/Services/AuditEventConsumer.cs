@@ -5,17 +5,22 @@ namespace CoreAPI.Services
 {
     public class AuditEventConsumer : BackgroundService
     {
+        private const int MaxDeliveryAttempts = 3;
+
         private readonly IAuditEventQueue _queue;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IAuditDeadLetterWriter _deadLetterWriter;
         private readonly ILogger<AuditEventConsumer> _logger;
 
         public AuditEventConsumer(
             IAuditEventQueue queue,
             IHttpClientFactory httpClientFactory,
+            IAuditDeadLetterWriter deadLetterWriter,
             ILogger<AuditEventConsumer> logger)
         {
             _queue = queue;
             _httpClientFactory = httpClientFactory;
+            _deadLetterWriter = deadLetterWriter;
             _logger = logger;
         }
 
@@ -34,35 +39,90 @@ namespace CoreAPI.Services
                     break;
                 }
 
-                await SendToAuditServiceAsync(auditEvent, stoppingToken);
+                await SendWithRetryAsync(auditEvent, stoppingToken);
             }
         }
 
-        private async Task SendToAuditServiceAsync(
+        private async Task SendWithRetryAsync(
             AuditEventRequest auditEvent,
             CancellationToken cancellationToken)
         {
-            try
-            {
-                var client = _httpClientFactory.CreateClient("AuditService");
-                var response = await client.PostAsJsonAsync("api/audit-events", auditEvent, cancellationToken);
+            string lastFailureReason = "Unknown failure.";
 
-                if (!response.IsSuccessStatusCode)
+            for (var attempt = 1; attempt <= MaxDeliveryAttempts; attempt++)
+            {
+                try
                 {
+                    var failureReason = await TrySendToAuditServiceAsync(
+                        auditEvent,
+                        cancellationToken);
+
+                    if (failureReason == null)
+                    {
+                        return;
+                    }
+
+                    lastFailureReason = failureReason;
                     _logger.LogWarning(
-                        "Audit Service returned {StatusCode} for event {EventType}",
-                        response.StatusCode,
-                        auditEvent.EventType);
+                        "Audit event {EventId} delivery attempt {Attempt}/{MaxAttempts} failed. Reason: {FailureReason}",
+                        auditEvent.EventId,
+                        attempt,
+                        MaxDeliveryAttempts,
+                        lastFailureReason);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // App shutdown is expected to cancel the background consumer.
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    lastFailureReason = ex.Message;
+                    _logger.LogWarning(
+                        ex,
+                        "Audit event {EventId} delivery attempt {Attempt}/{MaxAttempts} threw an exception.",
+                        auditEvent.EventId,
+                        attempt,
+                        MaxDeliveryAttempts);
+                }
+
+                if (attempt < MaxDeliveryAttempts)
+                {
+                    await Task.Delay(GetRetryDelay(attempt), cancellationToken);
                 }
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+
+            await _deadLetterWriter.WriteAsync(
+                auditEvent,
+                lastFailureReason,
+                MaxDeliveryAttempts,
+                cancellationToken);
+        }
+
+        private async Task<string?> TrySendToAuditServiceAsync(
+            AuditEventRequest auditEvent,
+            CancellationToken cancellationToken)
+        {
+            var client = _httpClientFactory.CreateClient("AuditService");
+            using var response = await client.PostAsJsonAsync(
+                "api/audit-events",
+                auditEvent,
+                cancellationToken);
+
+            if (response.IsSuccessStatusCode)
             {
-                // App shutdown is expected to cancel the background consumer.
+                return null;
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Audit Service call failed for event {EventType}", auditEvent.EventType);
-            }
+
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            return string.IsNullOrWhiteSpace(responseBody)
+                ? $"Audit Service returned HTTP {(int)response.StatusCode} {response.ReasonPhrase}."
+                : $"Audit Service returned HTTP {(int)response.StatusCode} {response.ReasonPhrase}: {responseBody}";
+        }
+
+        private static TimeSpan GetRetryDelay(int attempt)
+        {
+            return TimeSpan.FromSeconds(attempt);
         }
     }
 }

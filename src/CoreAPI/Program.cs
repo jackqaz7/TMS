@@ -45,6 +45,7 @@ builder.Services.AddScoped<IReconciliationBatchService, ReconciliationBatchServi
 // to AuditService. Later the Channel<T> can be replaced by Kafka/RabbitMQ.
 builder.Services.AddSingleton<IAuditEventQueue, ChannelAuditEventQueue>();
 builder.Services.AddSingleton<IAuditClient, AuditClient>();
+builder.Services.AddSingleton<IAuditDeadLetterWriter, FileAuditDeadLetterWriter>();
 builder.Services.AddHostedService<AuditEventConsumer>();
 // HttpClient factory pattern: AddHttpClient centralizes HttpClient creation and
 // lets ASP.NET Core reuse underlying handlers instead of creating raw sockets per call.
