@@ -64,6 +64,7 @@ namespace CoreAPI.Controllers
         private string GetCurrentUsername()
         {
             return User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
                 ?? User.Identity?.Name
                 ?? "system";
         }

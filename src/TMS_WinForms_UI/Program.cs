@@ -8,8 +8,10 @@ namespace TMS_WinForms_UI
         [STAThread]
         private static void Main()
         {
-            // WinForms owns the application lifetime in the hybrid shell.
-            // WPF is loaded later only as hosted UserControls inside ElementHost.
+            // STAThread concept: WinForms/WPF UI components run on a single-threaded
+            // apartment UI thread. Long work should be awaited or moved off this thread.
+            // WinForms owns the application lifetime in the hybrid shell; WPF is loaded
+            // later only as hosted UserControls inside ElementHost.
             WinFormsApplication.SetHighDpiMode(System.Windows.Forms.HighDpiMode.SystemAware);
             WinFormsApplication.EnableVisualStyles();
             WinFormsApplication.SetCompatibleTextRenderingDefault(false);

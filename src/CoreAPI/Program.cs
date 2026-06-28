@@ -7,22 +7,28 @@ using System.Diagnostics;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("Jwt:Key is missing from configuration.");
 
 // Controllers are the REST API entry points. ASP.NET Core will scan the project
 // for classes ending in Controller and map their actions through endpoint routing.
 builder.Services.AddControllers();
+builder.Services.AddSignalR();
 
 // OpenAPI exposes machine-readable API metadata in development. This helps tools
 // such as Swagger/HTTP clients understand available endpoints and request shapes.
 builder.Services.AddOpenApi();
 
+// Dependency Injection (DI): AddDbContext registers AuthDbContext with a scoped
+// lifetime, meaning each HTTP request gets its own EF Core context instance.
+// EF DbContext is not thread-safe, so background/parallel work should not share it.
 // AuthDbContext is intentionally separate from TmsDbContext so login/security data
 // can evolve independently from treasury trade data.
 builder.Services.AddDbContext<AuthDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("Auth")));
 
-// TmsDbContext is the treasury database boundary. EF Core creates SQL queries for
-// DbSet<Trade> operations used by TreasuryController.
+// Repository/Unit-of-Work concept through EF Core: TmsDbContext is the treasury
+// database boundary, and SaveChangesAsync commits tracked changes as one unit.
 builder.Services.AddDbContext<TmsDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("TMS")));
 
@@ -30,8 +36,8 @@ builder.Services.AddDbContext<TmsDbContext>(options =>
 // and any future client receive the same API-side validation behavior.
 builder.Services.AddScoped<ITradeValidationService, TradeValidationService>();
 
-// Reconciliation runs as a batch workflow: EF Core loads trade snapshots async,
-// then in-memory matching is partitioned and processed with bounded parallelism.
+// Batch processing concept: ReconciliationBatchService loads data with async/await,
+// then uses bounded parallel processing for CPU-side matching work.
 builder.Services.AddScoped<IReconciliationBatchService, ReconciliationBatchService>();
 
 // Audit uses a producer/consumer flow inside CoreAPI:
@@ -40,6 +46,8 @@ builder.Services.AddScoped<IReconciliationBatchService, ReconciliationBatchServi
 builder.Services.AddSingleton<IAuditEventQueue, ChannelAuditEventQueue>();
 builder.Services.AddSingleton<IAuditClient, AuditClient>();
 builder.Services.AddHostedService<AuditEventConsumer>();
+// HttpClient factory pattern: AddHttpClient centralizes HttpClient creation and
+// lets ASP.NET Core reuse underlying handlers instead of creating raw sockets per call.
 builder.Services.AddHttpClient("AuditService", client =>
 {
     var baseUrl = builder.Configuration["AuditService:BaseUrl"] ?? "https://localhost:7204";
@@ -67,7 +75,26 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
         IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            Encoding.UTF8.GetBytes(jwtKey))
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"].ToString();
+            var path = context.HttpContext.Request.Path;
+
+            // SignalR browser/desktop clients commonly pass the bearer token as an
+            // access_token query value during the hub handshake.
+            if (!string.IsNullOrWhiteSpace(accessToken) &&
+                path.StartsWithSegments("/hubs/notifications"))
+            {
+                context.Token = accessToken;
+            }
+
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -110,6 +137,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<NotificationsHub>("/hubs/notifications");
 
 app.Run();
 

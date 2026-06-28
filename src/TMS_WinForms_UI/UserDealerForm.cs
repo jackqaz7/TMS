@@ -76,6 +76,8 @@ namespace TMS_WinForms_UI
 
         private void ConfigureGrid()
         {
+            // Data binding concept: the grid columns map to UserAdminResponse
+            // properties. Selecting a row copies that DTO into the editor controls.
             _usersGrid.Dock = DockStyle.Fill;
             _usersGrid.BackgroundColor = System.Drawing.Color.White;
             _usersGrid.BorderStyle = BorderStyle.None;
@@ -315,6 +317,9 @@ namespace TMS_WinForms_UI
             try
             {
                 using var client = CreateAuthorizedClient();
+
+                // Higher-order function concept: Add/Update/Delete pass in the HTTP
+                // operation they need, while this shared method handles errors/reload.
                 var response = await sendAsync(client);
 
                 if (!response.IsSuccessStatusCode)
@@ -338,8 +343,8 @@ namespace TMS_WinForms_UI
         {
             var client = new HttpClient { BaseAddress = new Uri(CoreApiBaseAddress) };
 
-            // All user admin endpoints are protected. LoginForm stores the JWT here
-            // after CoreAPI authenticates the user.
+            // JWT bearer auth concept: all user admin endpoints are protected.
+            // LoginForm stores the token after CoreAPI authenticates the user.
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", SessionManager.JwtToken);
 
@@ -357,7 +362,7 @@ namespace TMS_WinForms_UI
             _idTextBox.Text = user.Id.ToString();
             _usernameTextBox.Text = user.Username;
             _passwordTextBox.Text = string.Empty;
-            _roleComboBox.Text = user.Role;
+            _roleComboBox.SelectedItem = user.Role;
             SetMessage("Selected user. Enter a password only if you want to change it.", false);
         }
 
@@ -366,7 +371,7 @@ namespace TMS_WinForms_UI
             _idTextBox.Clear();
             _usernameTextBox.Clear();
             _passwordTextBox.Clear();
-            _roleComboBox.Text = string.Empty;
+            _roleComboBox.SelectedIndex = -1;
         }
 
         private void SetMessage(string message, bool isError)

@@ -155,8 +155,8 @@ namespace TMS_WinForms_UI
                     Password = _passwordTextBox.Text
                 };
 
-                // WinForms login calls the CoreAPI login endpoint directly.
-                // The JWT is stored in the shared SessionManager for WPF hosted controls.
+                // async/await + REST concept: this HTTP call goes to CoreAPI without
+                // blocking the WinForms UI thread. CoreAPI returns a JWT on success.
                 var response = await client.PostAsJsonAsync("users/login", loginDto);
 
                 if (!response.IsSuccessStatusCode)
@@ -173,6 +173,8 @@ namespace TMS_WinForms_UI
                     return;
                 }
 
+                // Simple session state concept: the JWT is stored once and reused by
+                // WinForms screens and hosted WPF controls for authenticated API calls.
                 SessionManager.JwtToken = result.Token;
 
                 var shell = new MainShellForm();

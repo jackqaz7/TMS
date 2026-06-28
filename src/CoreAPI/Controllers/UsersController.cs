@@ -35,8 +35,9 @@ namespace CoreAPI.Controllers
         public async Task<IActionResult> Login([FromBody] LoginDto loginDto)
         {
             var sw = Stopwatch.StartNew();
-            // This is the first EF Core query in the login flow. It asks SQL Server for
-            // one user row matching the supplied username.
+            // EF Core query concept: this asks SQL Server for one user row matching the
+            // supplied username. This can be changed to SingleOrDefaultAsync later so
+            // the login flow is async all the way through.
             var user = _context.AppUsers.SingleOrDefault(u => u.Username == loginDto.Username);
 
             Console.WriteLine($"Login DB query took {sw.ElapsedMilliseconds} ms");
@@ -65,8 +66,8 @@ namespace CoreAPI.Controllers
                 return Unauthorized("Invalid username or password");
             }
 
-            // Claims are facts about the authenticated user that travel inside the JWT.
-            // Later we can add role/permission claims for authorization rules.
+            // JWT claims concept: these facts travel inside the token. ClaimTypes.Role
+            // enables role-based authorization such as [Authorize(Roles = "Admin")].
             var claims = new[]
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Username),
@@ -76,7 +77,9 @@ namespace CoreAPI.Controllers
 
             // The signing key proves the token was created by our API. The same key is
             // used by JWT middleware in Program.cs to validate future requests.
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+            var jwtKey = _configuration["Jwt:Key"]
+                ?? throw new InvalidOperationException("Jwt:Key is missing from configuration.");
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var token = new JwtSecurityToken(
@@ -88,6 +91,8 @@ namespace CoreAPI.Controllers
 
             Console.WriteLine($"Token creation took {sw.ElapsedMilliseconds} ms");
 
+            // Audit/event logging concept: business actions are recorded as structured
+            // events so another service or log store can answer "who did what?" later.
             await _auditClient.RecordAsync(new AuditEventRequest
             {
                 EventType = "LoginSucceeded",
@@ -162,6 +167,8 @@ namespace CoreAPI.Controllers
             _context.AppUsers.Add(user);
             await _context.SaveChangesAsync();
 
+            // CRUD audit logging: creating users changes security state, so we record
+            // the actor, entity, and before/after-relevant details.
             await _auditClient.RecordAsync(new AuditEventRequest
             {
                 EventType = "UserCreated",
@@ -235,7 +242,7 @@ namespace CoreAPI.Controllers
             // Blank password means "leave current password unchanged" from the edit screen.
             if (passwordChanged)
             {
-                user.PasswordHash = request.Password;
+                user.PasswordHash = request.Password!;
             }
 
             await _context.SaveChangesAsync();
@@ -310,6 +317,7 @@ namespace CoreAPI.Controllers
             // Admin actions are authenticated by JWT. The subject claim is the username
             // created during login, and becomes the audit "who did this" value.
             return User.FindFirstValue(JwtRegisteredClaimNames.Sub)
+                ?? User.FindFirstValue(ClaimTypes.NameIdentifier)
                 ?? User.Identity?.Name
                 ?? "system";
         }

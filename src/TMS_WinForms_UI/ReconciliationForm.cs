@@ -31,6 +31,7 @@ namespace TMS_WinForms_UI
         private readonly BindingList<LedgerEntryRow> _ledgerRows = new();
         private readonly BindingList<ReconciliationResultRow> _resultRows = new();
         private CancellationTokenSource? _runCancellation;
+        private bool _isRunning;
 
         public ReconciliationForm()
         {
@@ -86,7 +87,7 @@ namespace TMS_WinForms_UI
             {
                 Text = "Run settings",
                 Dock = DockStyle.Top,
-                Height = 86,
+                Height = 118,
                 Padding = new Padding(10),
                 Margin = new Padding(0, 0, 0, 12)
             };
@@ -191,6 +192,9 @@ namespace TMS_WinForms_UI
 
         private void ConfigureLedgerGrid()
         {
+            // Data binding concept: DataGridView reads/writes properties on objects in
+            // BindingList<LedgerEntryRow>. Because this grid is editable, user changes
+            // update _ledgerRows and BuildLedgerEntries can send them to CoreAPI.
             _ledgerGrid.Dock = DockStyle.Fill;
             _ledgerGrid.BackgroundColor = System.Drawing.Color.White;
             _ledgerGrid.BorderStyle = BorderStyle.None;
@@ -285,6 +289,11 @@ namespace TMS_WinForms_UI
 
         private async Task RunReconciliationAsync()
         {
+            if (_isRunning)
+            {
+                return;
+            }
+
             if (_fromDatePicker.Value.Date > _toDatePicker.Value.Date)
             {
                 SetSummary("From date cannot be after to date.", true);
@@ -310,7 +319,12 @@ namespace TMS_WinForms_UI
             };
 
             _runCancellation?.Dispose();
-            _runCancellation = new CancellationTokenSource();
+
+            // CancellationTokenSource concept: Cancel tells the pending HTTP request
+            // and backend pipeline that the user no longer wants this reconciliation run.
+            var runCancellation = new CancellationTokenSource();
+            _runCancellation = runCancellation;
+            _isRunning = true;
 
             SetBusy(true);
             SetSummary("Reconciliation is running in the background...", false);
@@ -319,22 +333,24 @@ namespace TMS_WinForms_UI
             {
                 using var client = CreateAuthorizedClient();
 
-                // This await keeps the WinForms UI thread free while CoreAPI does the
-                // async database read and parallel batch reconciliation on the server.
+                // async/await concept: await returns control to the WinForms message
+                // loop, so the UI can repaint and the Cancel button can still work.
+                // We do not use Task.Run here because CoreAPI owns the real database
+                // I/O and parallel reconciliation work.
                 var response = await client.PostAsJsonAsync(
                     "reconciliation/batches",
                     request,
-                    _runCancellation.Token);
+                    runCancellation.Token);
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    var body = await response.Content.ReadAsStringAsync(_runCancellation.Token);
+                    var body = await response.Content.ReadAsStringAsync(runCancellation.Token);
                     SetSummary($"{(int)response.StatusCode} {response.ReasonPhrase}: {body}", true);
                     return;
                 }
 
                 var batchResult = await response.Content
-                    .ReadFromJsonAsync<ReconciliationBatchResponse>(cancellationToken: _runCancellation.Token);
+                    .ReadFromJsonAsync<ReconciliationBatchResponse>(cancellationToken: runCancellation.Token);
 
                 if (batchResult == null)
                 {
@@ -354,6 +370,13 @@ namespace TMS_WinForms_UI
             }
             finally
             {
+                if (ReferenceEquals(_runCancellation, runCancellation))
+                {
+                    _runCancellation = null;
+                }
+
+                runCancellation.Dispose();
+                _isRunning = false;
                 SetBusy(false);
             }
         }
@@ -362,6 +385,8 @@ namespace TMS_WinForms_UI
         {
             var entries = new List<ReconciliationLedgerEntry>();
 
+            // DTO mapping concept: UI row objects are converted into API request models.
+            // The API/service still normalizes and validates again as the authority.
             foreach (var row in _ledgerRows)
             {
                 if (string.IsNullOrWhiteSpace(row.Currency) || string.IsNullOrWhiteSpace(row.Side))
@@ -385,6 +410,9 @@ namespace TMS_WinForms_UI
         private HttpClient CreateAuthorizedClient()
         {
             var client = new HttpClient { BaseAddress = new Uri(CoreApiBaseAddress) };
+
+            // JWT bearer auth concept: LoginForm stores the token once, and protected
+            // API calls include it in the Authorization header.
             client.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", SessionManager.JwtToken);
 
@@ -488,9 +516,13 @@ namespace TMS_WinForms_UI
             _runButton.Enabled = !isBusy;
             _cancelButton.Enabled = isBusy;
             _loadSampleScenarioButton.Enabled = !isBusy;
-            // Keep the progress bar visible so the Run settings panel does not
-            // resize/reflow when a reconciliation starts or finishes.
+            // Keep the progress bar space reserved to avoid layout flicker, but
+            // switch idle state to an empty bar so it does not look stuck.
+            _progressBar.Style = isBusy
+                ? ProgressBarStyle.Marquee
+                : ProgressBarStyle.Blocks;
             _progressBar.MarqueeAnimationSpeed = isBusy ? 30 : 0;
+            _progressBar.Value = 0;
             _ledgerGrid.Enabled = !isBusy;
 
             ResumeLayout();

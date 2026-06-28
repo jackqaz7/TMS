@@ -26,6 +26,9 @@ namespace CoreAPI.Services
         {
             var batchId = Guid.NewGuid();
             var stopwatch = Stopwatch.StartNew();
+
+            // Guardrail concept: clamp caller-provided batch settings so one request
+            // cannot accidentally create thousands of tiny batches or too many workers.
             var batchSize = Clamp(request.BatchSize, MinimumBatchSize, MaximumBatchSize);
             var maxDegreeOfParallelism = Clamp(
                 request.MaxDegreeOfParallelism,
@@ -33,9 +36,15 @@ namespace CoreAPI.Services
                 MaximumDegreeOfParallelism);
             var tolerance = request.Tolerance < 0 ? 0 : request.Tolerance;
 
+            // async/await concept: the database read is I/O-bound, so awaiting it frees
+            // the request thread while SQL Server returns the trade snapshot.
+            // We materialize the list before parallel work because DbContext is not
+            // thread-safe and should not be used inside Parallel.ForEachAsync.
             var trades = await QueryTradeSnapshots(request, cancellationToken);
             var ledgerEntries = NormalizeLedgerEntries(request.LedgerEntries);
 
+            // Grouping concept: reconciliation compares expected trades to external
+            // ledger entries by natural business key: currency + settlement date.
             var tradeGroups = trades
                 .GroupBy(t => new ReconciliationGroupKey(t.Currency, t.SettlementDate.Date))
                 .ToDictionary(g => g.Key, g => g.ToList());
@@ -54,6 +63,11 @@ namespace CoreAPI.Services
             var workerThreadIds = new ConcurrentDictionary<int, byte>();
             var batches = groupKeys.Chunk(batchSize);
 
+            // Parallel processing concept: Parallel.ForEachAsync processes independent
+            // reconciliation batches concurrently. MaxDegreeOfParallelism keeps it
+            // bounded so the API stays responsive under load.
+            // ConcurrentBag/ConcurrentDictionary are thread-safe collections used
+            // because multiple workers add results at the same time.
             await Parallel.ForEachAsync(
                 batches,
                 new ParallelOptions
@@ -110,6 +124,8 @@ namespace CoreAPI.Services
             ReconciliationBatchRequest request,
             CancellationToken cancellationToken)
         {
+            // AsNoTracking is a read-only EF Core optimization. Reconciliation only
+            // needs snapshots, not entity change tracking.
             var query = _tmsDbContext.Trades.AsNoTracking();
 
             if (request.FromSettlementDate.HasValue)
@@ -125,6 +141,8 @@ namespace CoreAPI.Services
             }
 
             return await query
+                // Projection concept: select only the columns needed for reconciliation
+                // before materializing the list, reducing memory and SQL payload size.
                 .Select(t => new ReconciliationTradeSnapshot(
                     t.Id,
                     t.TradeReference,
@@ -157,6 +175,8 @@ namespace CoreAPI.Services
             IReadOnlyCollection<ReconciliationLedgerEntry> ledgerEntries,
             decimal tolerance)
         {
+            // Pure function concept: this method has no database/UI side effects.
+            // That makes it safe to call from parallel workers and easy to unit test.
             var expectedBuy = trades.Where(t => t.Side == "BUY").Sum(t => t.Amount);
             var expectedSell = trades.Where(t => t.Side == "SELL").Sum(t => t.Amount);
             var actualBuy = ledgerEntries.Where(l => l.Side == "BUY").Sum(l => l.Amount);

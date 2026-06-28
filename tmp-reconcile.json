@@ -1,0 +1,23 @@
+{
+  "fromSettlementDate": "2026-06-26",
+  "toSettlementDate": "2026-06-26",
+  "tolerance": 0.01,
+  "batchSize": 2,
+  "maxDegreeOfParallelism": 4,
+  "ledgerEntries": [
+    {
+      "externalReference": "LED-USD-BUY-001",
+      "currency": "USD",
+      "side": "BUY",
+      "amount": 1000,
+      "settlementDate": "2026-06-26"
+    },
+    {
+      "externalReference": "LED-USD-SELL-001",
+      "currency": "USD",
+      "side": "SELL",
+      "amount": 250,
+      "settlementDate": "2026-06-26"
+    }
+  ]
+}

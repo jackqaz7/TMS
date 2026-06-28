@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Windows.Forms.Integration;
+using Microsoft.AspNetCore.SignalR.Client;
 using TMS_WPF_UI;
 using TMS_WPF_UI.Helpers;
 
@@ -17,10 +18,13 @@ namespace TMS_WinForms_UI
         private readonly Panel _contentPanel = new();
         private readonly Label _statusLabel = new();
         private readonly Button _logButton = new();
+        private HubConnection? _notificationsConnection;
         private ElementHost? _currentHost;
 
         public MainShellForm()
         {
+            // Shell pattern: this WinForms form owns the app window, navigation, and
+            // lifetime. Individual screens are swapped into _contentPanel.
             Text = "TMS Hybrid Shell";
             StartPosition = FormStartPosition.CenterScreen;
             Width = 1120;
@@ -29,6 +33,8 @@ namespace TMS_WinForms_UI
 
             BuildLayout();
             ShowDashboard();
+            Shown += async (_, _) => await StartNotificationsAsync();
+            FormClosed += async (_, _) => await StopNotificationsAsync();
         }
 
         private void BuildLayout()
@@ -81,7 +87,9 @@ namespace TMS_WinForms_UI
 
             _statusLabel.Dock = DockStyle.Bottom;
             _statusLabel.Height = 72;
+            _statusLabel.AutoEllipsis = true;
             _statusLabel.ForeColor = System.Drawing.Color.DarkSlateGray;
+            _statusLabel.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             _statusLabel.Text = "Ready";
 
             var logoutButton = new Button
@@ -113,7 +121,7 @@ namespace TMS_WinForms_UI
             _contentPanel.Controls.Clear();
 
             // ElementHost is the interop bridge: WinForms owns the shell, while WPF
-            // still renders this DashboardControl and uses its normal MVVM binding.
+            // still renders this DashboardControl and uses its normal MVVM data binding.
             _currentHost = new ElementHost
             {
                 Dock = DockStyle.Fill,
@@ -148,7 +156,7 @@ namespace TMS_WinForms_UI
         private async Task GenerateAuditLogEventsAsync()
         {
             _logButton.Enabled = false;
-            _statusLabel.Text = "Queueing 50 log events...";
+            SetShellStatus("Queueing 50 log events...", false);
 
             try
             {
@@ -161,27 +169,113 @@ namespace TMS_WinForms_UI
                 if (!response.IsSuccessStatusCode)
                 {
                     var body = await response.Content.ReadAsStringAsync();
-                    _statusLabel.ForeColor = System.Drawing.Color.Firebrick;
-                    _statusLabel.Text = $"{(int)response.StatusCode}: {body}";
+                    SetShellStatus($"{(int)response.StatusCode}: {body}", true);
                     return;
                 }
 
                 var result = await response.Content.ReadFromJsonAsync<AuditLogButtonResponse>();
 
-                _statusLabel.ForeColor = System.Drawing.Color.DarkGreen;
-                _statusLabel.Text = result == null
+                SetShellStatus(result == null
                     ? "Queued 50 log events."
-                    : $"Queued {result.EventsQueued} events in {result.EnqueueElapsedMilliseconds} ms.";
+                    : $"Queued {result.EventsQueued} events in {result.EnqueueElapsedMilliseconds} ms.",
+                    false);
             }
             catch (Exception ex)
             {
-                _statusLabel.ForeColor = System.Drawing.Color.Firebrick;
-                _statusLabel.Text = $"Log failed: {ex.Message}";
+                SetShellStatus($"Log failed: {ex.Message}", true);
             }
             finally
             {
                 _logButton.Enabled = true;
             }
+        }
+
+        private async Task StartNotificationsAsync()
+        {
+            if (_notificationsConnection != null)
+            {
+                return;
+            }
+
+            _notificationsConnection = new HubConnectionBuilder()
+                .WithUrl("https://localhost:7104/hubs/notifications", options =>
+                {
+                    // SignalR concept: the hub keeps a live connection open for server
+                    // notifications. It uses the same JWT auth as normal CoreAPI calls.
+                    options.AccessTokenProvider = () => Task.FromResult<string?>(SessionManager.JwtToken);
+                })
+                .WithAutomaticReconnect()
+                .Build();
+
+            _notificationsConnection.On<ReconciliationCompletedNotification>(
+                "ReconciliationCompleted",
+                notification =>
+                {
+                    SetShellStatus(
+                        $"Reconciliation completed: {notification.MatchedGroupCount} matched, " +
+                        $"{notification.BreakGroupCount} break(s), {notification.ElapsedMilliseconds} ms.",
+                        notification.BreakGroupCount > 0);
+                });
+
+            _notificationsConnection.Reconnecting += _ =>
+            {
+                SetShellStatus("Notification connection reconnecting...", true);
+                return Task.CompletedTask;
+            };
+
+            _notificationsConnection.Reconnected += _ =>
+            {
+                SetShellStatus("Notification connection restored.", false);
+                return Task.CompletedTask;
+            };
+
+            _notificationsConnection.Closed += _ =>
+            {
+                SetShellStatus("Notification connection closed.", true);
+                return Task.CompletedTask;
+            };
+
+            try
+            {
+                await _notificationsConnection.StartAsync();
+                SetShellStatus("Notifications connected.", false);
+            }
+            catch (Exception ex)
+            {
+                SetShellStatus($"Notifications unavailable: {ex.Message}", true);
+                await _notificationsConnection.DisposeAsync();
+                _notificationsConnection = null;
+            }
+        }
+
+        private async Task StopNotificationsAsync()
+        {
+            if (_notificationsConnection == null)
+            {
+                return;
+            }
+
+            await _notificationsConnection.DisposeAsync();
+            _notificationsConnection = null;
+        }
+
+        private void SetShellStatus(string message, bool isWarning)
+        {
+            if (IsDisposed || Disposing)
+            {
+                return;
+            }
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action(() => SetShellStatus(message, isWarning)));
+                return;
+            }
+
+            _statusLabel.ForeColor = isWarning
+                ? System.Drawing.Color.Firebrick
+                : System.Drawing.Color.DarkGreen;
+            _statusLabel.Text = message;
         }
 
         private HttpClient CreateAuthorizedClient()
@@ -205,6 +299,14 @@ namespace TMS_WinForms_UI
         {
             public int EventsQueued { get; set; }
             public long EnqueueElapsedMilliseconds { get; set; }
+        }
+
+        private sealed class ReconciliationCompletedNotification
+        {
+            public Guid BatchId { get; set; }
+            public int MatchedGroupCount { get; set; }
+            public int BreakGroupCount { get; set; }
+            public long ElapsedMilliseconds { get; set; }
         }
     }
 }
