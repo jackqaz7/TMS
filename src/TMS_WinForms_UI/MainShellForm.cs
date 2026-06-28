@@ -57,6 +57,14 @@ namespace TMS_WinForms_UI
             };
             usersButton.Click += (_, _) => ShowUsersAndDealers();
 
+            var reconciliationButton = new Button
+            {
+                Text = "Reconciliation",
+                Dock = DockStyle.Top,
+                Height = 36
+            };
+            reconciliationButton.Click += (_, _) => ShowReconciliation();
+
             var logoutButton = new Button
             {
                 Text = "Logout",
@@ -66,6 +74,7 @@ namespace TMS_WinForms_UI
             logoutButton.Click += (_, _) => Logout();
 
             sidebar.Controls.Add(logoutButton);
+            sidebar.Controls.Add(reconciliationButton);
             sidebar.Controls.Add(usersButton);
             sidebar.Controls.Add(dashboardButton);
             sidebar.Controls.Add(title);
@@ -102,6 +111,17 @@ namespace TMS_WinForms_UI
             // This screen is plain WinForms because it is a simple CRUD/admin form.
             // It still goes through CoreAPI so API validation remains authoritative.
             _contentPanel.Controls.Add(new UserDealerForm());
+        }
+
+        private void ShowReconciliation()
+        {
+            _currentHost?.Dispose();
+            _currentHost = null;
+            _contentPanel.Controls.Clear();
+
+            // Reconciliation is an operational WinForms screen. The UI uses async/await
+            // while CoreAPI performs database reads and parallel batch processing.
+            _contentPanel.Controls.Add(new ReconciliationForm());
         }
 
         private void Logout()

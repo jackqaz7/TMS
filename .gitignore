@@ -36,3 +36,5 @@ publish/
 *.generated.cs
 /Docs/Architecture
 /CODEX-INSTRUCTIONS.md
+/Docs/Sql/Seed100Trades.sql
+/Docs/Sql

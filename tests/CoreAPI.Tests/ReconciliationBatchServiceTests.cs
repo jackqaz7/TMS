@@ -71,6 +71,70 @@ public class ReconciliationBatchServiceTests
         Assert.Equal(-25m, result.BuyBreakAmount);
     }
 
+    [Fact]
+    public async Task RunBatchAsync_ReturnsMatchedGroup_WhenBreakIsInsideTolerance()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.Trades.Add(CreateTrade("TRD-004", "USD", "BUY", 1000m));
+        await dbContext.SaveChangesAsync();
+
+        var service = new ReconciliationBatchService(dbContext);
+        var request = new ReconciliationBatchRequest
+        {
+            Tolerance = 0.01m,
+            LedgerEntries =
+            {
+                CreateLedgerEntry("LED-004", "USD", "BUY", 1000.005m)
+            }
+        };
+
+        var response = await service.RunBatchAsync(request);
+
+        var result = Assert.Single(response.Results);
+        Assert.True(result.IsMatched);
+        Assert.Equal(0.005m, result.BuyBreakAmount);
+    }
+
+    [Fact]
+    public async Task RunBatchAsync_ClampsBatchSettings_WhenRequestValuesAreOutsideAllowedRange()
+    {
+        await using var dbContext = CreateDbContext();
+        var service = new ReconciliationBatchService(dbContext);
+        var request = new ReconciliationBatchRequest
+        {
+            BatchSize = 0,
+            MaxDegreeOfParallelism = 99
+        };
+
+        var response = await service.RunBatchAsync(request);
+
+        Assert.Equal(1, response.BatchSize);
+        Assert.Equal(16, response.MaxDegreeOfParallelism);
+    }
+
+    [Fact]
+    public async Task RunBatchAsync_NormalizesLedgerCurrencyAndSide_BeforeMatching()
+    {
+        await using var dbContext = CreateDbContext();
+        dbContext.Trades.Add(CreateTrade("TRD-005", "USD", "BUY", 1000m));
+        await dbContext.SaveChangesAsync();
+
+        var service = new ReconciliationBatchService(dbContext);
+        var request = new ReconciliationBatchRequest
+        {
+            LedgerEntries =
+            {
+                CreateLedgerEntry("LED-005", " usd ", " buy ", 1000m)
+            }
+        };
+
+        var response = await service.RunBatchAsync(request);
+
+        var result = Assert.Single(response.Results);
+        Assert.True(result.IsMatched);
+        Assert.Equal("USD", result.Currency);
+    }
+
     private static TmsDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<TmsDbContext>()
